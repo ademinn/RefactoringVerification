@@ -6,17 +6,13 @@ Class -> 'class' identifier '{' MemberList '}'
 
 MemberList -> Member MemberList | eps
 
-Member -> Type identifier Definition
-        | 'void' identifier MethodDefinition
-        | Constructor
+Member -> VariableDeclaration
+        | MethodDeclaration
 
-Constructor -> identifier MethodDefinition
+VariableDeclaration -> Type identifier ';' | Type identifier '=' Expression ';'
 
-Definition -> VariableDefinition ';' | MethodDefinition
-
-VariableDefinition -> '=' Expression | eps
-
-MethodDefinition -> '(' ParameterList ')' Block
+MethodDeclaration -> MaybeType identifier '(' ParameterList ')' Block
+MaybeType -> Type | 'void' | eps
 
 ParameterList -> Parameter ParameterOneList | eps
 
@@ -30,9 +26,7 @@ Block -> '{' BlockStatementList '}'
 
 BlockStatements -> BlockStatement BlockStatements | eps
 
-BlockStatement -> LocalVariableDeclaration ';' | Statement
-
-LocalVariableDeclaration -> Type identifier VariableDefinition
+BlockStatement -> VariableDeclaration | Statement
 
 // Statements
 
@@ -40,6 +34,7 @@ Statement -> Block
            | IfStatement
            | WhileStatement
            | ForStatement
+           | ReturnStatement
            | 'break' ';'
            | 'continue' ';'
            | Expression ';'
@@ -52,16 +47,22 @@ WhileStatement -> 'while' ParExpression Statement
 
 ParExpression -> '(' Expression ')'
 
-ForStatement -> 'for' '(' ForInit ';' Expression ';' ExpressionList ')' Statement
+ForStatement -> 'for' '(' ForInit ForExpression ForIncrement ')' Statement
 
-ForInit -> LocalVariableDeclaration | ExpressionList
+ForInit -> VariableDeclaration | ExpressionList ';'
+
+ForExpression -> Expression ';'
+
+ForIncrement -> ExpressionList
+
+ReturnStatement -> Return Expression ';' | Return ';'
 
 // Expressions
 
 Expression -> AssignmentExpression
 
 AssignmentExpression -> OrExpression
-                      | UnaryExpression '=' AssignmentExpression
+                      | VariableAccess '=' AssignmentExpression
 
 OrExpression -> AndExpression OrExpression'
 OrExpression' -> '||' AndExpression OrExpression' | eps
@@ -89,25 +90,38 @@ UnaryExpression -> PostfixExpression
                  | PrefixOperator PostfixExpression
 PrefixOperator -> '+' | '-' | '!' | IncDecOperator
 
-PostfixExpression -> PrimaryExpression PostfixExpression'
-PostfixExpression' -> PostfixOperator PostfixExpression' | eps
-PostfixOperator -> '(' ExpressionList ')' | '.' identifier | IncDecOperator
+PostfixExpression -> PrimaryExpression | VariableAccess IncDecOperator
 
 ExressionList -> Expression ExpressionOneList | eps
 ExpressionOneList -> ',' Expression ExpressionOneList | eps
 
-PrimaryExpression -> identifier
-                   | literal
-                   | SpecialName
+PrimaryExpression -> literal
+                   | 'null'
                    | ParExpression
-                   | 'new' QualifiedName '(' ExpressionList ')'
+                   | QualifiedName
 
-IncDecOperator -> '++' | '--'
+ObjectAccess -> 'this'
+              | 'new' ObjectType '(' ExpressionList ')'
+              | identifier '(' ExpressionList ')'
+              | identifier
+
+VariableAccess -> ObjectAccess LastFieldAccess | identifier
+
+LastFieldAccess -> '.' identifier LastFieldAccess
+                 | '.' identifier '(' ExpressionList ')' LastFieldAccess
+                 | '.' identifier
+
+QualifiedName -> ObjectAccess QualifiedName'
+QualifiedName' -> '.' identifier QualifiedName'
+                | '.' identifier '(' ExpressionList ')' QualifiedName'
+                | eps
+
+Return -> 'return'
 
 Type -> PrimaryType
-      | QualifiedName
+      | ObjectType
 
-QualifiedName -> identifier
+ObjectType -> identifier
 
 PrimaryType -> 'boolean'
              | 'byte'
@@ -117,4 +131,4 @@ PrimaryType -> 'boolean'
              | 'float'
              | 'double'
 
-SpecialName -> 'this' | 'null'
+IncDecOperator -> '++' | '--'
