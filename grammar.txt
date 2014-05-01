@@ -62,7 +62,7 @@ ReturnStatement -> Return Expression ';' | Return ';'
 Expression -> AssignmentExpression
 
 AssignmentExpression -> OrExpression
-                      | VariableAccess '=' AssignmentExpression
+                      | QualifiedName '=' AssignmentExpression
 
 OrExpression -> AndExpression OrExpression'
 OrExpression' -> '||' AndExpression OrExpression' | eps
@@ -90,7 +90,7 @@ UnaryExpression -> PostfixExpression
                  | PrefixOperator PostfixExpression
 PrefixOperator -> '+' | '-' | '!' | IncDecOperator
 
-PostfixExpression -> PrimaryExpression | VariableAccess IncDecOperator
+PostfixExpression -> PrimaryExpression | QualifiedName IncDecOperator
 
 ExressionList -> Expression ExpressionOneList | eps
 ExpressionOneList -> ',' Expression ExpressionOneList | eps
@@ -104,12 +104,6 @@ ObjectAccess -> 'this'
               | 'new' ObjectType '(' ExpressionList ')'
               | identifier '(' ExpressionList ')'
               | identifier
-
-VariableAccess -> ObjectAccess LastFieldAccess | identifier
-
-LastFieldAccess -> '.' identifier LastFieldAccess
-                 | '.' identifier '(' ExpressionList ')' LastFieldAccess
-                 | '.' identifier
 
 QualifiedName -> ObjectAccess QualifiedName'
 QualifiedName' -> '.' identifier QualifiedName'
