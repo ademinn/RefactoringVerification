@@ -8,26 +8,35 @@ import Data.Strict.Tuple
 %wrapper "posn"
 
 $digit      = [0-9]
-
-@idTail     = [A-Za-z0-9_]*
+$alpha      = [a-zA-Z_]
+$alphanum   = [a-zA-Z0-9_]
 
 @operator = "||" | "&&" | "==" | "!=" | "<" | ">" | "<=" | ">=" | "+" | "-" | "*" | "/" | "%" | "!" | "--" | "++" |
-    "(" | ")" | "{" | "}" | "," | ";" | "."
+    "(" | ")" | "{" | "}" | "," | ";" | "." | "="
 
 @keyword = class | void | if | else | while | for | break | continue | return | null | this |
     new | boolean | byte | short | int | long | float | double
 
 tokens :-
 
-    $white+                 ;
-    $digit+                 { makeToken (\s -> TLiteral . LInt . read $ s) }
-    $digit+ [Ll]            { makeToken (\s -> TLiteral . LLong . read . init $ s) }
-    [a-zA-Z_] [a-ZA-Z0-9_]* { makeToken (\s -> TId s) }
-    @operator               { makeToken (\s -> TOp s) }
-    @keyword                { makeToken (\s -> TKeyword s) }
+    $white+                     ;
+    $digit+                     { makeToken (\s -> TLiteral . LInt . read $ s) }
+    $digit+ [Ll]                { makeToken (\s -> TLiteral . LLong . read . init $ s) }
+    $digit+ \. $digit+          { makeToken (\s -> TLiteral . LDouble .read $ s) }
+    $digit+ \. $digit+ [Dd]?    { makeToken (\s -> TLiteral . LDouble .read . init  $ s) }
+    $digit+ \. $digit+ [Ff]?    { makeToken (\s -> TLiteral . LFloat .read . init  $ s) }
+    true                        { makeToken (\s -> TLiteral . LBoolean $ True) }
+    false                       { makeToken (\s -> TLiteral . LBoolean $ False) }
+    @operator                   { makeToken (\s -> TOperator s) }
+    @keyword                    { makeToken (\s -> TKeyword s) }
+    $alpha $alphanum*           { makeToken (\s -> TIdentifier s) }
 
 {
-data Token = Token TokenType (Pair Int Int)
+data Token
+    = Token
+    { tokenType :: TokenType
+    , position :: Pair Int Int
+    }
     deriving (Eq, Show)
 
 getPos :: AlexPosn -> Pair Int Int
@@ -46,8 +55,8 @@ data Literal
 
 data TokenType
     = TKeyword String
-    | TId String
-    | TOp String
+    | TIdentifier String
+    | TOperator String
     | TLiteral Literal
     deriving (Eq, Show)
 }
