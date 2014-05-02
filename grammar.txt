@@ -24,7 +24,7 @@ Parameter -> Type identifier
 
 Block -> '{' BlockStatementList '}'
 
-BlockStatements -> BlockStatement BlockStatements | eps
+BlockStatementList -> BlockStatement BlockStatementList | eps
 
 BlockStatement -> VariableDeclaration | Statement
 

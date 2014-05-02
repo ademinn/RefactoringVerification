@@ -15,12 +15,10 @@ build-type:          Simple
 cabal-version:       >=1.8
 
 library
-  -- main-is:             
-  -- other-modules:       
   build-depends:       base ==4.5.*, strict ==0.3.*, array ==0.4.*
   hs-source-dirs:      src
-  build-tools:         alex
-  exposed-modules:     Lexer
+  build-tools:         alex, happy
+  exposed-modules:     Lexer, Parser
 
 test-suite main-suite
   type:             exitcode-stdio-1.0

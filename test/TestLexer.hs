@@ -1,4 +1,4 @@
-module TestLexer where
+module TestLexer (testLexer) where
 
 import Test.HUnit
 
