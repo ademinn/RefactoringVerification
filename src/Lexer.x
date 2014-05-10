@@ -1,8 +1,8 @@
 {
 module Lexer where
 
-import Data.Int
 import Data.Strict.Tuple
+import AST
 }
 
 %wrapper "posn"
@@ -44,14 +44,6 @@ getPos (AlexPn _ line column) = line :!: column
 
 makeToken :: (String -> TokenType) -> AlexPosn -> String -> Token
 makeToken f p s = Token (f s) (getPos p)
-
-data Literal
-    = LInt Int32
-    | LLong Int64
-    | LFloat Float
-    | LDouble Double
-    | LBoolean Bool
-    deriving (Eq, Show)
 
 data TokenType
     = TKeyword String

@@ -15,14 +15,20 @@ build-type:          Simple
 cabal-version:       >=1.8
 
 library
-  build-depends:       base ==4.5.*, strict ==0.3.*, array ==0.4.*
+  build-depends:       base >=4.5, strict >=0.3, array >=0.4
   hs-source-dirs:      src
   build-tools:         alex, happy
   exposed-modules:     Lexer, Parser
+
+executable main
+  main-is:          Main.hs
+  hs-source-dirs:   src
+  build-depends:    base >=4.5, array >=0.4, strict >=0.3
+  other-modules:    Lexer, Parser
 
 test-suite main-suite
   type:             exitcode-stdio-1.0
   hs-source-dirs:   test
   main-is:          Test.hs
-  build-depends:    test-framework, test-framework-hunit, base ==4.5.*, HUnit >=1.2.5.2, Cabal >=1.14.0, JavaWithClasses
+  build-depends:    test-framework, test-framework-hunit, base >=4.5, HUnit >=1.2.5.2, Cabal >=1.14.0, JavaWithClasses
   other-modules:    TestLexer

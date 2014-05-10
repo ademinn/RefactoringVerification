@@ -87,12 +87,13 @@ MultiplicativeExpression' -> MultiplicativeOperator UnaryExpression Multiplicati
 MultiplicativeOperator -> '*' | '/' | '%'
 
 UnaryExpression -> PostfixExpression
-                 | PrefixOperator PostfixExpression
-PrefixOperator -> '+' | '-' | '!' | IncDecOperator
+                 | PrefixOperator Unaryexpression
+                 | IncDecOperator QualifiedName
+PrefixOperator -> '+' | '-' | '!'
 
 PostfixExpression -> PrimaryExpression | QualifiedName IncDecOperator
 
-ExressionList -> Expression ExpressionOneList | eps
+ExpressionList -> Expression ExpressionOneList | eps
 ExpressionOneList -> ',' Expression ExpressionOneList | eps
 
 PrimaryExpression -> literal
