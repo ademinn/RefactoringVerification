@@ -24,14 +24,14 @@ data Variable
 
 data Method
     = Method
-    { methodType :: MaybeType
+    { methodType :: MethodType
     , methodName :: String
     , methodParams :: [Parameter]
     , methodBlock :: Block
     }
     deriving (Eq, Show)
 
-data MaybeType = ReturnType Type | Void | Constructor
+data MethodType = ReturnType Type | Void | Constructor
     deriving (Eq, Show)
 
 data Parameter

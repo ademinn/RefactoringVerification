@@ -99,28 +99,33 @@ MemberListRev
     | {- empty -}           { [] }
 
 Member :: { Member }
-Member
-    : VariableDeclaration       { MemberVD $1 }
-    | MethodDeclaration         { MemberMD $1 }
+    : Type identifier Definition { $3 $1 $2 }
+    | void identifier MethodDefinition { MemberMD $ $3 Void $2 }
+    | identifier MethodDefinition { MemberMD $ $2 Constructor $1 }
+
+Definition :: { Type -> String -> Member }
+Definition
+    : VariableDefinition { \vType vName -> MemberVD $ $1 vType vName }
+    | MethodDefinition { \mType mName -> MemberMD $ $1 (ReturnType mType) mName }
+
+VariableDefinition :: { Type -> String -> Variable }
+VariableDefinition
+    : "=" Expression ";" { \vType vName -> Variable vType vName (Just $2) }
+    | ";" { \vType vName -> Variable vType vName Nothing }
+
+MethodDefinition :: { MethodType -> String -> Method }
+MethodDefinition
+    : "(" ParameterList ")" Block { \mType mName -> Method mType mName $2 $4 }
 
 VariableDeclaration :: { Variable }
 VariableDeclaration
     : Type identifier ";"       { Variable $1 $2 Nothing }
     | Type identifier "=" Expression ";"    { Variable $1 $2 (Just $4) }
 
-MethodDeclaration :: { Method }
-MethodDeclaration
-    : MaybeType identifier "(" ParameterList ")" Block      { Method $1 $2 $4 $6 }
-
-MaybeType :: { MaybeType }
-MaybeType
-    : Type      { ReturnType $1 }
-    | void      { Void }
-    | {- empty -}   { Constructor }
-
 ParameterList :: { [Parameter] }
 ParameterList
     : ParameterListRev      { reverse $1 }
+    | {- empty -}   { [] }
 
 ParameterListRev :: { [Parameter] }
 ParameterListRev
@@ -230,6 +235,7 @@ Expression
 ExpressionList :: { [Expression] }
 ExpressionList
     : ExpressionRevList { reverse $1 }
+    | {- empty -}   { [] }
 
 ExpressionRevList :: { [Expression] }
 ExpressionRevList
