@@ -4,6 +4,7 @@ module Parser where
 import Lexer
 import AST
 import Data.Strict.Tuple
+import Data.Either
 }
 
 %name parse
@@ -87,7 +88,7 @@ ClassListRev
 
 Class :: { Class }
 Class
-    : class identifier "{" MemberList "}"       { Class $2 $4 }
+    : class identifier "{" MemberList "}"       { buildClass $2 $4 }
 
 MemberList :: { [Member] }
 MemberList
@@ -100,13 +101,13 @@ MemberListRev
 
 Member :: { Member }
     : Type identifier Definition { $3 $1 $2 }
-    | void identifier MethodDefinition { MemberMD $ $3 Void $2 }
-    | identifier MethodDefinition { MemberMD $ $2 Constructor $1 }
+    | void identifier MethodDefinition { Right $ $3 Void $2 }
+    | identifier MethodDefinition { Right $ $2 Constructor $1 }
 
 Definition :: { Type -> String -> Member }
 Definition
-    : VariableDefinition { \vType vName -> MemberVD $ $1 vType vName }
-    | MethodDefinition { \mType mName -> MemberMD $ $1 (ReturnType mType) mName }
+    : VariableDefinition { \vType vName -> Left $ $1 vType vName }
+    | MethodDefinition { \mType mName -> Right $ $1 (ReturnType mType) mName }
 
 VariableDefinition :: { Type -> String -> Variable }
 VariableDefinition
@@ -258,7 +259,7 @@ Type
 
 ObjectType :: { ObjectType }
 ObjectType
-    : identifier { CustomType $1 }
+    : identifier { $1 }
 
 PrimaryType :: { PrimaryType }
 PrimaryType
@@ -274,4 +275,11 @@ PrimaryType
 parseError :: [Token] -> a
 parseError ((Token t (line :!: column)) : _) = error $ "unexpected token " ++ (show t) ++ " at position " ++ (show line) ++ ":" ++ (show column)
 parseError [] = error "unexpected end of file"
+
+type Member = Either Variable Method
+
+buildClass :: String -> [Member] -> Class
+buildClass name members = Class name fields methods
+    where (fields, methods) = partitionEithers members
+
 }

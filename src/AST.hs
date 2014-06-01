@@ -1,17 +1,16 @@
 module AST where
 
 import Data.Int
+-- import Data.Strict.Tuple
 
 type Program = [Class]
 
 data Class
     = Class
     { className :: String
-    , classMembers :: [Member]
+    , classFields :: [Variable]
+    , classMethods :: [Method]
     }
-    deriving (Eq, Show)
-
-data Member = MemberVD Variable | MemberMD Method
     deriving (Eq, Show)
 
 data Variable
@@ -119,11 +118,10 @@ data QualifiedName
     | This
     deriving (Eq, Show)
  
-data Type = ObjectType ObjectType | PrimaryType PrimaryType
+data Type = ObjectType ObjectType | PrimaryType PrimaryType | NullType
     deriving (Eq, Show)
 
-data ObjectType = CustomType String
-    deriving (Eq, Show)
+type ObjectType = String
 
 data PrimaryType
     = TBoolean
@@ -133,7 +131,7 @@ data PrimaryType
     | TLong
     | TFloat
     | TDouble
-    deriving (Eq, Show)
+    deriving (Eq, Show, Ord)
 
 data Literal
     = LInt Int32
