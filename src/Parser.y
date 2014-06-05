@@ -248,7 +248,7 @@ QualifiedName
     : QualifiedName "." identifier  { FieldAccess $1 $3 }
     | QualifiedName "." identifier "(" ExpressionList ")"  { MethodCall $1 $3 $5 }
     | identifier "(" ExpressionList ")" { MethodCall This $1 $3 }
-    | identifier { FieldOrVar $1 }
+    | identifier { Var $1 }
     | new ObjectType  "(" ExpressionList ")"  { New $2 $4 }
     | this { This }
 

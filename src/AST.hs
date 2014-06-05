@@ -113,7 +113,7 @@ data Expression
 data QualifiedName
     = FieldAccess QualifiedName String
     | MethodCall QualifiedName String [Expression]
-    | FieldOrVar String
+    | Var String
     | New ObjectType [Expression]
     | This
     deriving (Eq, Show)
@@ -140,3 +140,10 @@ data Literal
     | LDouble Double
     | LBoolean Bool
     deriving (Eq, Show)
+
+literalType :: Literal -> PrimaryType
+literalType (LInt _) = TInt
+literalType (LLong _) = TLong
+literalType (LFloat _) = TFloat
+literalType (LDouble _) = TDouble
+literalType (LBoolean _) = TBoolean
