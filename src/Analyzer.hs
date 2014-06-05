@@ -38,7 +38,8 @@ data AnalyzerState
     = AnalyzerState
     { program :: Program
     , symbolTable :: SymbolTable
-    , currentClass :: Class
+    , currentMaybeClass :: Maybe Class
+    , currentMaybeMethod :: Maybe Method
     } deriving Show
 
 type AnalyzerT m a = StateT AnalyzerState (WriterT [SemanticError] m) a
@@ -55,6 +56,12 @@ data Ternary = Zero | Half | One
 
 class Analyzable a where
     analyze :: a -> Analyzer ()
+
+currentClass :: AnalyzerState -> Class
+currentClass = fromJust . currentMaybeClass
+
+currentMethod :: AnalyzerState -> Method
+currentMethod = fromJust . currentMaybeMethod
 
 analyzeMaybe :: Analyzable a => Maybe a -> Analyzer ()
 analyzeMaybe = Foldable.mapM_ analyze 
@@ -328,6 +335,26 @@ analyzeReturnExpression expr = do
         ReturnType t -> return t
         _ -> stopAnalyzer "Expression does not return anything"
 
+analyzeExpr :: Expression -> Analyzer (Maybe MethodType)
+analyzeExpr expr = do
+    s <- get
+    let res = runIdentity . runErrorT . runWriterT . runStateT (analyzeExpression expr) $ s
+    case res of
+        Left err -> do
+            newError err
+            return Nothing
+        Right ((t, st), _) -> do
+            put st
+            return $ Just t
+
+ifOkExpr :: Expression -> (MethodType -> Analyzer ()) -> Analyzer ()
+ifOkExpr expr f = do
+    mt <- analyzeExpr expr
+    Foldable.forM_ mt f
+
+checkBoolExpr :: Expression -> SemanticError -> Analyzer ()
+checkBoolExpr expr err = ifOkExpr expr $ \mt -> CM.unless (mt == ReturnType (PrimaryType TBoolean)) $ newError err
+
 instance Analyzable Type where
     analyze t = do
         defined <- isTypeDefined t
@@ -337,9 +364,6 @@ instance Analyzable MethodType where
     analyze (ReturnType t) = analyze t
     analyze _ = return ()
 
-instance Analyzable Expression where
-    analyze _ = return ()
-        
 instance Analyzable Parameter where
     analyze param = do
         analyze . paramType $ param
@@ -351,32 +375,36 @@ instance Analyzable Variable where
         analyze t
         i <- case expr of
             Just e -> do
-                analyze e
-                return True -- FIXME add typecheck
+                ifOkExpr e $ \mt -> case mt of
+                    ReturnType t' -> CM.unless (t == t') $ newError $ "Type mismatch: " ++ show t ++ " != " ++ show t'
+                    _ -> newError "Cannot assign void"
+                return True
             Nothing -> return False
         addLocalVar t n i
 
 instance Analyzable If where
     analyze (If cond cons alt) = do
-        analyze cond
+        checkBoolExpr cond $ "Not boolean condition: " ++ show cond
         analyze cons
         analyzeMaybe alt
 
 instance Analyzable While where
     analyze (While cond st) = do
-        analyze cond
+        checkBoolExpr cond $ "Not boolean condition: " ++ show cond
         analyze st
 
 instance Analyzable ForInit where
     analyze (ForInitVD var) = analyze var
-    analyze (ForInitEL ls) = CM.mapM_ analyze ls
+    analyze (ForInitEL ls) = do
+        CM.mapM_ analyzeExpr ls
+        return ()
 
 instance Analyzable For where
     analyze (For i cond inc st) = do
         addScope
         analyze i
-        analyze cond
-        CM.mapM_ analyze inc
+        checkBoolExpr cond $ "Not boolean condition: " ++ show cond
+        CM.mapM_ analyzeExpr inc
         analyze st
         removeScope
 
@@ -385,10 +413,14 @@ instance Analyzable Statement where
     analyze (IfStatement st) = analyze st
     analyze (WhileStatement st) = analyze st
     analyze (ForStatement st) = analyze st
-    analyze (Return expr) = analyzeMaybe expr
+    analyze (Return expr) = do
+        ret <- methodType <$> gets currentMethod
+        case expr of
+            Nothing -> CM.unless (ret == Void) $ newError "Missing return value"
+            Just e -> ifOkExpr e $ \mt -> CM.unless (ret == mt) $ newError $ "Incompatible types: required " ++ show ret ++ ", found " ++ show mt
     analyze Break = return ()
     analyze Continue = return ()
-    analyze (ExpressionStatement expr) = analyze expr
+    analyze (ExpressionStatement expr) = void $ analyzeExpr expr
 
 instance Analyzable BlockStatement where
     analyze (BlockVD var) = analyze var
@@ -402,8 +434,7 @@ instance Analyzable Block where
 
 instance Analyzable Method where
     analyze mth = do
-        cls <- gets currentClass
         analyze . methodType $ mth
-        let params = Parameter (ObjectType $ className cls) "this" : methodParams mth
+        let params = methodParams mth
         CM.mapM_ analyze params
         analyze . methodBlock $ mth
