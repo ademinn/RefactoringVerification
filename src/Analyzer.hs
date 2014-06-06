@@ -36,7 +36,7 @@ type SemanticError = String
 
 data AnalyzerState
     = AnalyzerState
-    { program :: Program
+    { maybeProgram :: Maybe Program
     , symbolTable :: SymbolTable
     , currentMaybeClass :: Maybe Class
     , currentMaybeMethod :: Maybe Method
@@ -56,6 +56,15 @@ data Ternary = Zero | Half | One
 
 class Analyzable a where
     analyze :: a -> Analyzer ()
+
+defaultSymbolTable :: SymbolTable
+defaultSymbolTable = SymbolTable Map.empty []
+
+defaultAnalyzerState :: AnalyzerState
+defaultAnalyzerState = AnalyzerState Nothing defaultSymbolTable Nothing Nothing
+
+program :: AnalyzerState -> Program
+program = fromJust . maybeProgram
 
 currentClass :: AnalyzerState -> Class
 currentClass = fromJust . currentMaybeClass
@@ -174,15 +183,18 @@ canCast from to
     | otherwise = Zero
 
 castTypeLists :: [Type] -> [Type] -> Ternary
-castTypeLists from to = List.minimum $ List.zipWith canCast from to
+castTypeLists from to
+    | length from /= length to = Zero
+    | null from = One
+    | otherwise = List.minimum $ List.zipWith canCast from to
 
 filterMethod :: Method -> [Type] -> Ternary
 filterMethod ms params = castTypeLists params $ map paramType $ methodParams ms
 
-checkMethod :: ObjectType -> String -> [Type] -> AnalyzerError MethodType
-checkMethod typeName mth prms = do
+checkMethod :: ObjectType -> String -> [Type] -> (Method -> Bool) -> AnalyzerError MethodType
+checkMethod typeName mth prms f = do
     cls <- checkClass typeName
-    let methods = filter (\m -> (methodName m == mth) && (filterMethod m prms /= Zero)) $ classMethods cls
+    let methods = filter (\m -> (methodName m == mth) && (filterMethod m prms /= Zero) && f m) $ classMethods cls
         (ones, halfs) = List.partition (\m -> filterMethod m prms == One) methods
     if length ones == 1
         then
@@ -212,7 +224,7 @@ analyzeQualifiedName (MethodCall qn method params) = do
     t <- analyzeQualifiedName qn
     paramTypes <- mapM analyzeReturnExpression params
     case t of
-        ReturnType (ObjectType ot) -> checkMethod ot method paramTypes
+        ReturnType (ObjectType ot) -> checkMethod ot method paramTypes (\m -> methodType m /= Constructor)
         Constructor -> error "error in analyzer"
         t' -> stopAnalyzer $ show t' ++ " has no methods"
                             
@@ -224,7 +236,7 @@ analyzeQualifiedName (Var var) = do
 
 analyzeQualifiedName (New typeName params) = do
     paramTypes <- mapM analyzeReturnExpression params
-    _ <- checkMethod typeName typeName paramTypes
+    void $ checkMethod typeName typeName paramTypes (\m -> methodType m == Constructor)
     return . ReturnType . ObjectType $ typeName
 analyzeQualifiedName This = ReturnType <$> ObjectType <$> className <$> gets currentClass
 
@@ -380,7 +392,8 @@ instance Analyzable Variable where
                     _ -> newError "Cannot assign void"
                 return True
             Nothing -> return False
-        addLocalVar t n i
+        mth <- gets currentMaybeMethod
+        CM.when (isJust mth) $ addLocalVar t n i
 
 instance Analyzable If where
     analyze (If cond cons alt) = do
@@ -434,7 +447,30 @@ instance Analyzable Block where
 
 instance Analyzable Method where
     analyze mth = do
+        modify $ \s -> s { currentMaybeMethod = Just mth }
+        addScope
         analyze . methodType $ mth
         let params = methodParams mth
         CM.mapM_ analyze params
         analyze . methodBlock $ mth
+        removeScope
+        modify $ \s -> s { currentMaybeMethod = Nothing }
+
+checkIfConstructor :: Method -> Analyzer ()
+checkIfConstructor mth = do
+    clsName <- gets $ className . currentClass
+    CM.when (methodType mth == Constructor && clsName /= methodName mth) $ newError "Invalid method declaration: return type required"
+
+instance Analyzable Class where
+    analyze cls = do
+        modify $ \s -> s { currentMaybeClass = Just cls }
+        CM.mapM_ analyze $ classFields cls
+        CM.mapM_ analyze $ classMethods cls
+        modify $ \s -> s { currentMaybeClass = Nothing }
+
+instance Analyzable Program where
+    analyze p = do
+        modify $ \s -> s { maybeProgram = Just p }
+        CM.mapM_ analyze p
+        modify $ \s -> s { maybeProgram = Nothing }
+
