@@ -11,25 +11,16 @@ import qualified Data.Map as Map
 import qualified Data.List as List
 import qualified Data.Foldable as Foldable
 
+import Scope
 import AST
+import Type
 
 type FieldsIndexes = Map.Map String (Map.Map String Int)
-
-data VarSymbol
-    = VarSymbol
-    { vsName :: String
-    , vsType :: Type
-    , vsInit :: Bool
-    } deriving Show
-
-type BlockVariables = Map.Map String VarSymbol
-
-type Scope = [BlockVariables]
 
 data SymbolTable
     = SymbolTable
     { fieldsIndexes :: FieldsIndexes
-    , scope :: Scope
+    , stScope :: Scope
     } deriving Show
 
 type SemanticError = String
@@ -51,11 +42,12 @@ type AnalyzerError a = AnalyzerT (ErrorT String Identity) a
 data ValueType = LValue | RValue
     deriving (Show, Eq, Ord)
 
-data Ternary = Zero | Half | One
-    deriving (Show, Eq, Ord)
-
 class Analyzable a where
     analyze :: a -> Analyzer ()
+
+instance Scoped AnalyzerState where
+    getScope = stScope . symbolTable
+    setScope st sc = st { symbolTable = (symbolTable st) { stScope = sc } }
 
 defaultSymbolTable :: SymbolTable
 defaultSymbolTable = SymbolTable Map.empty []
@@ -83,19 +75,6 @@ stopAnalyzer err = do
     newError err
     throwError err
 
-updateScope :: (Scope -> Scope) -> Analyzer ()
-updateScope f = do
-    st <- get
-    let sym = symbolTable st
-    let ls = scope sym
-    put st { symbolTable = sym { scope = f ls } }
-
-addScope :: Analyzer ()
-addScope = updateScope $ \s -> Map.empty : s
-
-removeScope :: Analyzer ()
-removeScope = updateScope tail
-
 findType :: (Monad m) => ObjectType -> AnalyzerT m (Maybe Class)
 findType typeName = do
     classes <- gets program
@@ -116,19 +95,6 @@ checkClassFields cls = do
     CM.mapM_ (checkTypeDefined . varType) (classFields cls)
     return ()
 
-findLocalVar :: String -> Scope -> Maybe VarSymbol
-findLocalVar n l = join . List.find isJust $ map (Map.lookup n) l
-
-lookupLocalVar :: (Monad m) => String -> AnalyzerT m (Maybe VarSymbol)
-lookupLocalVar n = do
-    vars <- gets $ scope . symbolTable
-    return $ findLocalVar n vars
-
-isLocalVarDefined :: String -> Analyzer Bool
-isLocalVarDefined n = do
-    var <- lookupLocalVar n
-    return $ isJust var
-
 getLocalVar :: String -> Analyzer (Maybe VarSymbol)
 getLocalVar n = do
     var <- lookupLocalVar n
@@ -137,10 +103,8 @@ getLocalVar n = do
 
 addLocalVar :: Type -> String -> Bool -> Analyzer ()
 addLocalVar t n i = do
-    defined <- isLocalVarDefined n
-    if defined
-        then newError $ "Variable with name " ++ n ++ " already defined"
-        else updateScope $ \(l:ls) -> Map.insert n (VarSymbol n t i) l : ls
+    res <- newLocalVar t n i
+    Foldable.forM_ res newError
 
 checkClass :: String -> AnalyzerError Class
 checkClass clsName = do
@@ -148,45 +112,6 @@ checkClass clsName = do
     case mcls of
         Just cls -> return cls
         Nothing -> stopAnalyzer $ "No class with name " ++ clsName
-
-inferPrimary :: PrimaryType -> PrimaryType -> Maybe PrimaryType
-inferPrimary TBoolean TBoolean = Just TBoolean
-inferPrimary TBoolean _ = Nothing
-inferPrimary _ TBoolean = Nothing
-inferPrimary t1 t2 = case compare t1 t2 of
-    GT -> Just t1
-    EQ -> Just t1
-    LT -> Just t2
-
-infer :: Type -> Type -> Maybe Type
-infer (PrimaryType t1) (PrimaryType t2) = PrimaryType <$> inferPrimary t1 t2
-infer t1 t2 = if t1 == t2 then Just t1 else Nothing
-
-castPrimary :: PrimaryType -> PrimaryType -> Bool
-castPrimary TBoolean TBoolean = True
-castPrimary TBoolean _ = False
-castPrimary _ TBoolean = False
-castPrimary t1 t2 = t1 <= t2
-
-cast :: Type -> Type -> Bool
-cast (PrimaryType t1) (PrimaryType t2) = castPrimary t1 t2
-cast (PrimaryType _) _ = False
-cast _ (PrimaryType _) = False
-cast _ NullType = error "error in compiler"
-cast NullType _ = True
-cast t1 t2 = t1 == t2
-
-canCast :: Type -> Type -> Ternary
-canCast from to
-    | from == to = One
-    | cast from to = Half
-    | otherwise = Zero
-
-castTypeLists :: [Type] -> [Type] -> Ternary
-castTypeLists from to
-    | length from /= length to = Zero
-    | null from = One
-    | otherwise = List.minimum $ List.zipWith canCast from to
 
 filterMethod :: Method -> [Type] -> Ternary
 filterMethod ms params = castTypeLists params $ map paramType $ methodParams ms

@@ -1,7 +1,6 @@
 module AST where
 
-import Data.Int
--- import Data.Strict.Tuple
+import Type
 
 type Program = [Class]
 
@@ -117,33 +116,3 @@ data QualifiedName
     | New ObjectType [Expression]
     | This
     deriving (Eq, Show)
- 
-data Type = ObjectType ObjectType | PrimaryType PrimaryType | NullType
-    deriving (Eq, Show)
-
-type ObjectType = String
-
-data PrimaryType
-    = TBoolean
-    | TByte
-    | TShort
-    | TInt
-    | TLong
-    | TFloat
-    | TDouble
-    deriving (Eq, Show, Ord)
-
-data Literal
-    = LInt Int32
-    | LLong Int64
-    | LFloat Float
-    | LDouble Double
-    | LBoolean Bool
-    deriving (Eq, Show)
-
-literalType :: Literal -> PrimaryType
-literalType (LInt _) = TInt
-literalType (LLong _) = TLong
-literalType (LFloat _) = TFloat
-literalType (LDouble _) = TDouble
-literalType (LBoolean _) = TBoolean
