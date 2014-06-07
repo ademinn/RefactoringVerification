@@ -6,53 +6,47 @@ import Data.Maybe
 import qualified Data.List as List
 import qualified Data.Map as Map
 
-import Type
+type BlockVariables t = Map.Map String t
 
-data VarSymbol
-    = VarSymbol
-    { vsName :: String
-    , vsType :: Type
-    , vsInit :: Bool
-    } deriving Show
+type Scope t = [BlockVariables t]
 
-type BlockVariables = Map.Map String VarSymbol
-
-type Scope = [BlockVariables]
-
-class Scoped a where
-    getScope :: a -> Scope
-    setScope :: a -> Scope -> a
-    modifyScope :: (Scope -> Scope) -> a -> a
+class Scoped a t | a -> t where
+    getScope :: a -> Scope t
+    setScope :: a -> Scope t -> a
+    modifyScope :: (Scope t -> Scope t) -> a -> a
     modifyScope f a = setScope a $ f . getScope $ a
 
-scope :: (Scoped s, MonadState s m) =>  m Scope
+scope :: (Scoped s t, MonadState s m) =>  m (Scope t)
 scope = gets getScope
 
-updateScope :: (Scoped s, MonadState s m) => (Scope -> Scope) -> m ()
+updateScope :: (Scoped s t, MonadState s m) => (Scope t -> Scope t) -> m ()
 updateScope f = modify $ modifyScope f
 
-addScope :: (Scoped s, MonadState s m) => m ()
+addScope :: (Scoped s t, MonadState s m) => m ()
 addScope = updateScope $ \s -> Map.empty : s
 
-removeScope :: (Scoped s, MonadState s m) => m ()
+removeScope :: (Scoped s t, MonadState s m) => m ()
 removeScope = updateScope tail
 
-findLocalVar :: String -> Scope -> Maybe VarSymbol
+findLocalVar :: String -> Scope t -> Maybe t
 findLocalVar n l = join . List.find isJust $ map (Map.lookup n) l
 
-lookupLocalVar :: (Scoped s, Functor m, MonadState s m) => String -> m (Maybe VarSymbol)
+lookupLocalVar :: (Scoped s t, Functor m, MonadState s m) => String -> m (Maybe t)
 lookupLocalVar n = findLocalVar n <$> scope
 
-isLocalVarDefined :: (Scoped s, Functor m, MonadState s m) => String -> m Bool
+localVar :: (Scoped s t, Functor m, MonadState s m) => String -> m t
+localVar n = fromJust <$> lookupLocalVar n
+
+isLocalVarDefined :: (Scoped s t, Functor m, MonadState s m) => String -> m Bool
 isLocalVarDefined n = do
     var <- lookupLocalVar n
     return $ isJust var
 
-newLocalVar :: (Scoped s, Functor m, MonadState s m) => Type -> String -> Bool -> m (Maybe String)
-newLocalVar t n i = do
+newLocalVar :: (Scoped s t, Functor m, MonadState s m) => String -> t -> m (Maybe String)
+newLocalVar n t = do
     defined <- isLocalVarDefined n
     if defined
         then return . Just $ "Variable with name " ++ n ++ " already defined"
         else do
-            updateScope $ \(l:ls) -> Map.insert n (VarSymbol n t i) l : ls
+            updateScope $ \(l:ls) -> Map.insert n t l : ls
             return Nothing

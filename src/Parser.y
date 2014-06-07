@@ -3,6 +3,7 @@ module Parser where
 
 import Lexer
 import AST
+import Type
 import Data.Strict.Tuple
 import Data.Either
 }

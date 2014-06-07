@@ -2,7 +2,7 @@
 module Lexer where
 
 import Data.Strict.Tuple
-import AST
+import Type
 }
 
 %wrapper "posn"
