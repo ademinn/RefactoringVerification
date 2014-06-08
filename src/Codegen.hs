@@ -347,7 +347,7 @@ genStuct cls = A.TypeDefinition (A.Name $ className cls) $ Just $ T.StructureTyp
 
 goToBlock :: A.Name -> Codegen A.BasicBlock
 goToBlock name = do
-    exitLabel <- nextLabel "ExitBlock"
+    exitLabel <- nextLabel "GoToBlock"
     return $ A.BasicBlock exitLabel [] $ I.Do $ I.Br name []
 
 type EStatement = Either (A.BasicBlock -> [A.BasicBlock]) [A.BasicBlock]
@@ -381,11 +381,16 @@ genIfConsAlt ifLabel flag calcFlag getConsBlocks getAltBlocks finBlock = genIfCo
         consBlocks = getConsBlocks finBlock
         altBlocks = getAltBlocks finBlock
 
+getExpressionRes :: Expression -> Codegen (A.Operand, [A.Named I.Instruction])
+getExpressionRes e = do
+    op <- (snd . fromJust) <$> genExpression e
+    calc <- popInstructions
+    return (op, calc)
+
 genIf :: If -> Codegen EStatement
 genIf (If cond cons alt) = do
     ifLabel <- nextLabel "If"
-    (_, flag) <- fromJust <$> genExpression cond
-    calcFlag <- popInstructions
+    (flag, calcFlag) <- getExpressionRes cond
     consBlocks' <- genStatement cons
     let genIfCons' = genIfCons ifLabel flag calcFlag
         genIfConsAlt' = genIfConsAlt ifLabel flag calcFlag
@@ -402,6 +407,53 @@ genIf (If cond cons alt) = do
             case altBlocks' of
                 Left getAlt -> return . Left $ genIfConsAlt' (const consBlocks) getAlt
                 Right altBlocks -> return . Right $ genIfConsAltOk ifLabel flag calcFlag consBlocks altBlocks
+
+genWhile :: While -> Codegen (A.BasicBlock -> [A.BasicBlock])
+genWhile (While cond st) = do
+    whileLabel <- nextLabel "While"
+    lastBlock <- goToBlock whileLabel
+    (flag, calcFlag) <- getExpressionRes cond
+    stBlocks' <- genStatement st
+    let stBlocks = case stBlocks' of
+            Left f -> f lastBlock
+            Right b -> b
+        stBlockName = getBBName . head $ stBlocks
+    return $ \finBlock ->
+        let finBlockName = getBBName finBlock in
+        [A.BasicBlock whileLabel calcFlag (I.Do $ I.CondBr flag stBlockName finBlockName [])] ++ stBlocks ++ [lastBlock]
+
+genExpressionList :: [Expression] -> Codegen ()
+genExpressionList = mapM_ genExpression
+
+genForInit :: ForInit -> Codegen ()
+genForInit (ForInitEL l) = genExpressionList l
+genForInit _ = undefined
+
+brBlock :: A.Name -> A.Name -> [A.Named I.Instruction] -> A.BasicBlock
+brBlock name next instr = A.BasicBlock name instr $ I.Do $ I.Br next []
+
+genFor :: For -> Codegen (A.BasicBlock -> [A.BasicBlock])
+genFor (For fInit cond inc st) = do
+    addScope
+    initLabel <- nextLabel "ForInit"
+    genForInit fInit
+    calcInit <- popInstructions
+    forLabel <- nextLabel "For"
+    (flag, calcFlag) <- getExpressionRes cond
+    stBlocks' <- genStatement st
+    incLabel <- nextLabel "ForInc"
+    genExpressionList inc
+    calcInc <- popInstructions
+    let initBlock = brBlock initLabel forLabel calcInit
+        incBlock = brBlock incLabel forLabel calcInc
+        stBlocks = case stBlocks' of
+            Left f -> f incBlock
+            Right b -> b
+        stBlockName = getBBName . head $ stBlocks
+    removeScope
+    return $ \finBlock ->
+        let finBlockName = getBBName finBlock in
+        [initBlock] ++ [A.BasicBlock forLabel calcFlag (I.Do $ I.CondBr flag stBlockName finBlockName [])] ++ stBlocks ++ [incBlock]
 
 genStatement :: Statement -> Codegen EStatement
 genStatement _ = undefined
