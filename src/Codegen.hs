@@ -350,23 +350,60 @@ goToBlock name = do
     exitLabel <- nextLabel "ExitBlock"
     return $ A.BasicBlock exitLabel [] $ I.Do $ I.Br name []
 
-genIf :: If -> Codegen [A.BasicBlock]
-genIf (If cond cons alt) = do
-    flag <- genExpression cond
-    calcFlag <- popInstructions
-    consBB' <- genStatement cons
-    let ifTrue = getBBName . head $ consBB'
-    exitIf <- nextLabel "ExitIf"
-    exitConsBB <- goToBlock exitIf
-    let consBB = consBB' ++ [exitConsBB]
-    (ifFalse, altBB) <- case alt of
-        Nothing -> return (exitIf, [])
-        Just st -> do
-            altBB' <- genStatement st
-            return (getBBName . head $ altBB', altBB')
-    return []
+type EStatement = Either (A.BasicBlock -> [A.BasicBlock]) [A.BasicBlock]
 
-genStatement :: Statement -> Codegen [A.BasicBlock]
+genIfConsAltOk
+    :: A.Name -> A.Operand -> [A.Named I.Instruction]
+    -> [A.BasicBlock]
+    -> [A.BasicBlock]
+    -> [A.BasicBlock]
+genIfConsAltOk ifLabel flag calcFlag consBlocks altBlocks = A.BasicBlock ifLabel calcFlag (I.Do $ I.CondBr flag consBlockName altBlockName []) : (consBlocks ++ altBlocks)
+    where
+        consBlockName = getBBName . head $ consBlocks
+        altBlockName = getBBName . head $ altBlocks
+
+genIfCons
+    :: A.Name -> A.Operand -> [A.Named I.Instruction]
+    -> (A.BasicBlock -> [A.BasicBlock]) -> A.BasicBlock -> [A.BasicBlock]
+genIfCons ifLabel flag calcFlag getConsBlocks finBlock = A.BasicBlock ifLabel calcFlag (I.Do $ I.CondBr flag consBlockName finBlockName []) : consBlocks
+    where
+        finBlockName = getBBName finBlock
+        consBlocks = getConsBlocks finBlock
+        consBlockName = getBBName . head $ consBlocks
+
+genIfConsAlt
+    :: A.Name -> A.Operand -> [A.Named I.Instruction]
+    -> (A.BasicBlock -> [A.BasicBlock])
+    -> (A.BasicBlock -> [A.BasicBlock])
+    -> A.BasicBlock -> [A.BasicBlock]
+genIfConsAlt ifLabel flag calcFlag getConsBlocks getAltBlocks finBlock = genIfConsAltOk ifLabel flag calcFlag consBlocks altBlocks
+    where
+        consBlocks = getConsBlocks finBlock
+        altBlocks = getAltBlocks finBlock
+
+genIf :: If -> Codegen EStatement
+genIf (If cond cons alt) = do
+    ifLabel <- nextLabel "If"
+    (_, flag) <- fromJust <$> genExpression cond
+    calcFlag <- popInstructions
+    consBlocks' <- genStatement cons
+    let genIfCons' = genIfCons ifLabel flag calcFlag
+        genIfConsAlt' = genIfConsAlt ifLabel flag calcFlag
+    case (consBlocks', alt) of
+        (Left getCons, Nothing) -> return . Left $ genIfCons' getCons
+        (Left getCons, Just alt') -> do    
+            altBlocks' <- genStatement alt'
+            case altBlocks' of
+                Left getAlt -> return . Left $ genIfConsAlt' getCons getAlt
+                Right altBlocks -> return . Left $ genIfConsAlt' getCons (const altBlocks)
+        (Right consBlocks, Nothing) -> return . Left $ genIfCons' $ const consBlocks
+        (Right consBlocks, Just alt') -> do
+            altBlocks' <- genStatement alt'
+            case altBlocks' of
+                Left getAlt -> return . Left $ genIfConsAlt' (const consBlocks) getAlt
+                Right altBlocks -> return . Right $ genIfConsAltOk ifLabel flag calcFlag consBlocks altBlocks
+
+genStatement :: Statement -> Codegen EStatement
 genStatement _ = undefined
 
 genBlockStatement :: BlockStatement -> Codegen [A.BasicBlock]
