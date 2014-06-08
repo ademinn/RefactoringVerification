@@ -2,9 +2,12 @@ module Codegen where
 
 import qualified LLVM.General.AST as A
 import qualified LLVM.General.AST.Type as T
+import qualified LLVM.General.AST.Float as F
 import qualified LLVM.General.AST.Constant as C
 import qualified LLVM.General.AST.Instruction as I
 import qualified LLVM.General.AST.CallingConvention as CC
+import qualified LLVM.General.AST.IntegerPredicate as IP
+import qualified LLVM.General.AST.FloatingPointPredicate as FPP
 
 import Control.Applicative
 import Control.Monad.State
@@ -28,6 +31,7 @@ data CodegenState
     , lastInd :: Word
     , instructions :: [A.Named I.Instruction]
     , structSizes :: Map.Map ObjectType A.Operand
+    , lastLabel :: Word
     }
 
 instance Scoped CodegenState (Type, A.Operand) where
@@ -54,10 +58,20 @@ mapPrimaryType TLong = T.IntegerType 64
 mapPrimaryType TFloat = T.FloatingPointType 32 T.IEEE
 mapPrimaryType TDouble = T.FloatingPointType 64 T.IEEE
 
+literalToOp :: Literal -> A.Operand
+literalToOp l = A.ConstantOperand $ f l
+    where
+        f (LBoolean False) = C.Int 1 0
+        f (LBoolean True) = C.Int 1 1
+        f (LInt i) = C.Int 32 $ toInteger i
+        f (LLong i) = C.Int 64 $ toInteger i
+        f (LFloat i) = C.Float $ F.Single i
+        f (LDouble i) = C.Float $ F.Double i
+
 mapType :: Type -> T.Type
 mapType (PrimaryType t) = mapPrimaryType t
 mapType (ObjectType t) = T.NamedTypeReference (A.Name t) 
-mapType NullType = error "mapType" -- FIXME
+mapType NullType = error "mapType"
 
 mapMethodType :: Class -> MethodType -> T.Type
 mapMethodType _ (ReturnType t) = mapType t
@@ -91,14 +105,168 @@ objType _ = error "objType"
 structPtrSize :: Word32
 structPtrSize = 32
 
+alignment :: Word32
+alignment = 0
+
 structFieldAddr :: Int -> A.Operand
 structFieldAddr i = A.ConstantOperand . C.Int structPtrSize $ toInteger i
 
-genExpression :: Expression -> Codegen (Maybe (Type, A.Operand))
-genExpression _ = undefined
+castPrimatyTypeOperand :: (PrimaryType, A.Operand) -> PrimaryType -> Codegen A.Operand
+castPrimatyTypeOperand (ot, op) t = if ot == t then return op else addInstr $ f t op (mapPrimaryType t) []
+    where
+        f TInt = I.SExt
+        f TLong = I.SExt
+        f TFloat = I.FPExt
+        f TDouble = I.FPExt
+        f _ = error "cast primary type operand"
+
+castOperand :: (Type, A.Operand) -> Type -> Codegen A.Operand
+castOperand (NullType, _) (ObjectType t) = return . A.ConstantOperand $ C.Null $ mapType $ ObjectType t
+castOperand (PrimaryType pt, op) (PrimaryType t) = castPrimatyTypeOperand (pt, op) t
+castOperand (ObjectType ot, op) (ObjectType t) = if ot == t then return op else error "cast operand"
+castOperand _ _ = error "cast operand"
 
 castList :: [(Type, A.Operand)] -> [Type] -> Codegen [A.Operand]
-castList _ _ = undefined
+castList ops ts = forM (zip ops ts) (uncurry castOperand)
+
+inferOperand :: (Type, A.Operand) -> (Type, A.Operand) -> Codegen (Type, (A.Operand, A.Operand))
+inferOperand (t1, o1) (t2, o2) = do
+    let t = fromJust $ infer t1 t2
+    r1 <- castOperand (t1, o1) t
+    r2 <- castOperand (t2, o2) t
+    return (t, (r1, r2))
+
+genTypedBinaryOpM
+    :: Expression -> Expression
+    -> (Type -> A.Operand -> A.Operand -> Codegen I.Instruction)
+    -> Codegen (Maybe (Type, A.Operand))
+genTypedBinaryOpM expr1 expr2 f = do
+    e1 <- fromJust <$> genExpression expr1
+    e2 <- fromJust <$> genExpression expr2
+    (t, (o1, o2)) <- inferOperand e1 e2
+    i <- f t o1 o2
+    r <- addInstr i
+    return $ Just (t, r)
+
+genTypedBinaryOp
+    :: Expression -> Expression
+    -> (Type -> A.Operand -> A.Operand -> I.Instruction)
+    -> Codegen (Maybe (Type, A.Operand))
+genTypedBinaryOp expr1 expr2 f = genTypedBinaryOpM expr1 expr2 $ \t o1 o2 -> return $ f t o1 o2
+
+genBinaryOp
+    :: Expression -> Expression
+    -> (A.Operand -> A.Operand -> I.Instruction)
+    -> Codegen (Maybe (Type, A.Operand))
+genBinaryOp expr1 expr2 f = genTypedBinaryOp expr1 expr2 $ const f
+
+genCmpOp
+    :: Expression -> Expression
+    -> IP.IntegerPredicate -> FPP.FloatingPointPredicate
+    -> Codegen (Maybe (Type, A.Operand))
+genCmpOp e1 e2 ip fpp = genTypedBinaryOpM e1 e2 f
+    where
+        f (PrimaryType TFloat) o1 o2 = return $ I.FCmp fpp o1 o2 []
+        f (PrimaryType TDouble) o1 o2 = return $ I.FCmp fpp o1 o2 []
+        f (PrimaryType _) o1 o2 = return $ I.ICmp ip o1 o2 []
+        f _ o1 o2 = do
+            o1i <- addInstr $ I.PtrToInt o1 (T.IntegerType structPtrSize) []
+            o2i <- addInstr $ I.PtrToInt o2 (T.IntegerType structPtrSize) []
+            return $ I.ICmp ip o1i o2i []
+
+genArithmOp
+    :: Expression -> Expression
+    -> (A.Operand -> A.Operand -> I.InstructionMetadata -> I.Instruction)
+    -> (A.Operand -> A.Operand -> I.InstructionMetadata -> I.Instruction)
+    -> Codegen (Maybe (Type, A.Operand))
+genArithmOp expr1 expr2 fi ff = genTypedBinaryOp expr1 expr2 f
+    where
+        f (PrimaryType TFloat) o1 o2 = ff o1 o2 []
+        f (PrimaryType TDouble) o1 o2 = ff o1 o2 []
+        f (PrimaryType TBoolean) _ _ = error "genExpression"
+        f (PrimaryType _) o1 o2 = fi o1 o2 []
+        f _ _ _ = error "genExpression"
+
+oneOp :: Type -> A.Operand
+oneOp (PrimaryType t) = f t
+    where
+        f TInt = literalToOp $ LInt 1
+        f TLong = literalToOp $ LLong 1
+        f _ = error "typed one"
+oneOp _ = error "typed one"
+
+load :: A.Operand -> Codegen A.Operand
+load ptr = addInstr $ I.Load False ptr Nothing alignment []
+
+store :: A.Operand -> A.Operand -> Codegen ()
+store ptr val = addVoidInstr $ I.Store False ptr val Nothing alignment []
+
+genPrePostOp
+    :: QualifiedName
+    -> (Bool -> Bool -> A.Operand -> A.Operand -> I.InstructionMetadata -> I.Instruction)
+    -> Codegen (Type, A.Operand, A.Operand)
+genPrePostOp qn f = do
+    (t, qPtr) <- fromJust <$> genQualifiedName qn
+    qVal <- load qPtr
+    newVal <- addInstr $ f False False qVal (oneOp t) []
+    store qPtr newVal
+    return (t, qVal, newVal)
+
+genPreOp
+    :: QualifiedName
+    -> (Bool -> Bool -> A.Operand -> A.Operand -> I.InstructionMetadata -> I.Instruction)
+    -> Codegen (Maybe (Type, A.Operand))
+genPreOp qn f = do
+    (t, _, val) <- genPrePostOp qn f
+    return $ Just (t, val)
+
+genPostOp
+    :: QualifiedName
+    -> (Bool -> Bool -> A.Operand -> A.Operand -> I.InstructionMetadata -> I.Instruction)
+    -> Codegen (Maybe (Type, A.Operand))
+genPostOp qn f = do
+    (t, val, _) <- genPrePostOp qn f
+    return $ Just (t, val)
+
+genExpression :: Expression -> Codegen (Maybe (Type, A.Operand))
+genExpression (Assign qn expr) = do
+    (qType, qPtr) <- fromJust <$> genQualifiedName qn
+    eRes <- fromJust <$> genExpression expr
+    val <- castOperand eRes qType
+    store qPtr val
+    return $ Just (qType, val)
+genExpression (Or e1 e2) = genBinaryOp e1 e2 $ \o1 o2 -> I.Or o1 o2 []
+genExpression (And e1 e2) = genBinaryOp e1 e2 $ \o1 o2 -> I.And o1 o2 []
+genExpression (Equal e1 e2) = genCmpOp e1 e2 IP.EQ FPP.OEQ
+genExpression (Ne e1 e2) = genCmpOp e1 e2 IP.NE FPP.ONE
+genExpression (Lt e1 e2) = genCmpOp e1 e2 IP.SLT FPP.OLT
+genExpression (Gt e1 e2) = genCmpOp e1 e2 IP.SGT FPP.OGT
+genExpression (Le e1 e2) = genCmpOp e1 e2 IP.SLE FPP.OLE
+genExpression (Ge e1 e2) = genCmpOp e1 e2 IP.SGE FPP.OGE
+genExpression (Plus e1 e2) = genArithmOp e1 e2 (I.Add False False) I.FAdd
+genExpression (Minus e1 e2) = genArithmOp e1 e2 (I.Sub False False) I.FSub
+genExpression (Mul e1 e2) = genArithmOp e1 e2 (I.Mul False False) I.FMul
+genExpression (Div e1 e2) = genArithmOp e1 e2 (I.SDiv False) I.FDiv
+genExpression (Mod e1 e2) = genArithmOp e1 e2 I.SRem I.FRem
+genExpression (Pos e1) = genExpression e1
+genExpression (Neg e1) = genExpression (Minus (Literal $ LInt 0) e1)
+genExpression (Not expr) = do
+    (t, eRes) <- fromJust <$> genExpression expr
+    notE <- addInstr $ I.Sub False False (literalToOp $ LBoolean True) eRes []
+    return $ Just (t, notE)
+genExpression (PreInc qn) = genPreOp qn I.Add
+genExpression (PreDec qn) = genPreOp qn I.Sub
+genExpression (PostInc qn) = genPostOp qn I.Add
+genExpression (PostDec qn) = genPostOp qn I.Sub
+genExpression (QN qn) = do
+    qRes <- genQualifiedName qn
+    case qRes of
+        Nothing -> return Nothing
+        Just (qType, qPtr) -> do
+            qVal <- load qPtr
+            return $ Just (qType, qVal)
+genExpression (Literal l) = return $ Just (PrimaryType $ literalType l, literalToOp l)
+genExpression Null = return $ Just (NullType, A.ConstantOperand $ C.Null T.VoidType)
 
 call :: String -> [A.Operand] -> I.Instruction
 call name params = I.Call False CC.C [] (Right . A.ConstantOperand . C.GlobalReference . A.Name $ name) (map (\s -> (s, [])) params) [] []
@@ -157,6 +325,72 @@ genQualifiedName This = do
     cls <- getClassM
     let op = A.LocalReference $ A.Name "this"
     return $ Just (ObjectType . className $ cls, op)
+
+nextLabel :: String -> Codegen A.Name
+nextLabel l = do
+    i' <- gets lastLabel
+    let i = i' + 1
+    modify $ \s -> s { lastLabel = i }
+    return $ A.Name $ l ++ "." ++ show i
+
+popInstructions :: Codegen [A.Named I.Instruction]
+popInstructions = do
+    i <- gets instructions
+    modify $ \s -> s { instructions = [] }
+    return i
+
+getBBName :: A.BasicBlock -> A.Name
+getBBName (A.BasicBlock name _ _) = name
+
+genStuct :: Class -> A.Definition
+genStuct cls = A.TypeDefinition (A.Name $ className cls) $ Just $ T.StructureType False $ map (mapType . varType) $ classFields cls
+
+goToBlock :: A.Name -> Codegen A.BasicBlock
+goToBlock name = do
+    exitLabel <- nextLabel "ExitBlock"
+    return $ A.BasicBlock exitLabel [] $ I.Do $ I.Br name []
+
+genIf :: If -> Codegen [A.BasicBlock]
+genIf (If cond cons alt) = do
+    flag <- genExpression cond
+    calcFlag <- popInstructions
+    consBB' <- genStatement cons
+    let ifTrue = getBBName . head $ consBB'
+    exitIf <- nextLabel "ExitIf"
+    exitConsBB <- goToBlock exitIf
+    let consBB = consBB' ++ [exitConsBB]
+    (ifFalse, altBB) <- case alt of
+        Nothing -> return (exitIf, [])
+        Just st -> do
+            altBB' <- genStatement st
+            return (getBBName . head $ altBB', altBB')
+    return []
+
+genStatement :: Statement -> Codegen [A.BasicBlock]
+genStatement _ = undefined
+
+genBlockStatement :: BlockStatement -> Codegen [A.BasicBlock]
+genBlockStatement _ = undefined
+
+genMethod :: Method -> Codegen A.Definition
+genMethod _ = undefined
+
+genPreInit :: Class -> Codegen [A.Named I.Instruction]
+genPreInit _ = undefined
+
+genClass :: Class -> Codegen [A.Definition]
+genClass cls = do
+    modify $ \s -> s { csClass = Just cls }
+    modify $ \s -> s { csClass = Nothing }
+    return []
+
+genProgram :: Program -> Codegen A.Module
+genProgram p = do
+    modify $ \s -> s { csProgram = Just p }
+    defs <- concat <$> forM p genClass
+    modify $ \s -> s { csProgram = Nothing }
+    return A.defaultModule { A.moduleDefinitions = defs }
+    
 -- import LLVM.General.AST
 -- import LLVM.General.AST.Global as G
 -- import qualified LLVM.General.AST.Type as T
