@@ -117,7 +117,7 @@ mapType NullType = error "mapType"
 mapMethodType :: Class -> MethodType -> T.Type
 mapMethodType _ (ReturnType t) = mapType t
 mapMethodType _ Void = T.VoidType
-mapMethodType cls Constructor = A.NamedTypeReference . A.Name . className $ cls
+mapMethodType cls Constructor = getPointerType . A.NamedTypeReference . A.Name . className $ cls
 
 nextName :: Codegen A.Name
 nextName = do
@@ -153,8 +153,11 @@ structPtrSize = 32
 alignment :: Word32
 alignment = 0
 
+addrSpace :: AddrSpace.AddrSpace
+addrSpace = AddrSpace.AddrSpace 0
+
 getPointerType :: T.Type -> T.Type
-getPointerType t = T.PointerType t $ AddrSpace.AddrSpace 0
+getPointerType t = T.PointerType t addrSpace
 
 structFieldAddr :: Int -> A.Operand
 structFieldAddr i = A.ConstantOperand . C.Int structPtrSize $ toInteger i
@@ -365,7 +368,9 @@ genQualifiedName (MethodCall qn mthName params) = do
         Constructor -> error "genQualifiedName"
         ReturnType rt -> do
             retOp <- addInstr instr
-            return $ Just (rt, retOp)
+            ptr <- addInstr $ alloca (mapType rt)
+            store ptr retOp
+            return $ Just (rt, ptr)
 genQualifiedName (Var var) = do
     mv <- lookupLocalVar var
     case mv of
@@ -377,11 +382,10 @@ genQualifiedName (New ot params) = do
     ptr <- new ot
     instr <- callMethod ot mth ptr paramsOp
     retOp <- addInstr instr
-    return $ Just (ObjectType ot, retOp)
+    ptr' <- addInstr . alloca . mapType $ ObjectType ot
+    store ptr' retOp
+    return $ Just (ObjectType ot, ptr')
 genQualifiedName This = genQualifiedName (Var "this")
---    cls <- getClassM
---    let op = A.LocalReference $ A.Name "this"
---    return $ Just (ObjectType . className $ cls, op)
 
 nextLabel :: String -> Codegen A.Name
 nextLabel l = do
@@ -581,7 +585,7 @@ joinEStatements l = case last l of
     (Right b) -> Right $ foldESt b $ init l
     _ -> Left $ \finBlock -> foldESt [finBlock] l
     where
-        joinESt est bl = case est of
+        joinESt est bl =  case est of
             Left f -> (f . head $ bl) ++ bl
             Right bl' -> bl' ++ bl
         foldESt = foldr joinESt
@@ -654,78 +658,44 @@ genClass cls = do
     modify $ \s -> s { csClass = Nothing }
     return $ struct : methods
 
+mallocDecl :: A.Definition
+mallocDecl = A.GlobalDefinition G.functionDefaults
+    { G.returnType = T.PointerType (T.IntegerType 8) addrSpace
+    , G.name = A.Name "malloc"
+    , G.parameters = ([G.Parameter (T.IntegerType 32) (A.Name "size") []], False)
+    }
+
+printfDecl :: A.Definition
+printfDecl = A.GlobalDefinition G.functionDefaults
+    { G.returnType = T.IntegerType 32
+    , G.name = A.Name "printf"
+    , G.parameters = ([G.Parameter (getPointerType $ T.IntegerType 8) (A.Name "format") []], True)
+    }
+
+mainFunc :: Codegen A.Definition
+mainFunc = do
+    addScope
+    let name = "Main"
+    mth <- fromRight "new" <$> findMethod name name [] (\m -> methodType m == Constructor)
+    ptr <- new name
+    i <- callMethod name mth ptr []
+    void $ addInstr i
+    instr <- popInstructions
+    mainLabel <- nextLabel "main"
+    let block = A.BasicBlock mainLabel instr $ A.Do $ I.Ret (Just $ A.ConstantOperand $ C.Int 32 0) []
+    removeScope
+    return . A.GlobalDefinition $ G.functionDefaults
+        { G.returnType = T.IntegerType 32
+        , G.name = A.Name "main"
+        , G.parameters = ([], False)
+        , G.basicBlocks = [block]
+        }
+
 genProgram :: Program -> Codegen A.Module
 genProgram p = do
     modify $ \s -> s { csProgram = Just p }
     defs <- concat <$> forM p genClass
+    mainF <- mainFunc
+    let allDefs = mallocDecl : printfDecl : mainF : defs
     modify $ \s -> s { csProgram = Nothing }
-    return A.defaultModule { A.moduleDefinitions = defs }
-    
--- import LLVM.General.AST
--- import LLVM.General.AST.Global as G
--- import qualified LLVM.General.AST.Type as T
--- 
--- import Control.Monad.Identity
--- import Control.Monad.State
--- import Data.Maybe
--- import qualified Data.Map as Map
--- 
--- import AST
--- 
--- type SymbolTable = Map.Map String Operand
--- 
--- type SemanticError = String
--- 
--- data CodegenState
---     = CodegenState
---     { program :: Program
---     , symbolTable :: SymbolTable
---     , errors :: [SemanticError]
---     } deriving Show
--- 
--- type CodegenT m a = StateT CodegenState m a
--- 
--- type Codegen a = CodegenT Identity a
--- 
--- classStruct :: Class -> Codegen T.Type
--- classStruct cls = do
---     fieldTypes <- fmap catMaybes $ mapM fieldStruct $ classFields cls
---     return $ StructureType False fieldTypes
--- 
--- fieldStruct :: Variable -> Codegen (Maybe T.Type)
--- fieldStruct = mapType . varType
--- 
--- mapMethodType :: AST.Class -> AST.MethodType -> Codegen (Maybe T.Type)
--- mapMethodType _ (ReturnType t) = mapType t
--- mapMethodType _ Void = return $ Just T.VoidType
--- mapMethodType cls Constructor = return . Just . NamedTypeReference . Name . className $ cls
--- 
--- mapType :: AST.Type -> Codegen (Maybe T.Type)
--- mapType (PrimaryType t) = return . Just . mapPrimaryType $ t
--- mapType (ObjectType t) = do
---     defined <- checkTypeDefined t
---     return $ if defined then Just $ NamedTypeReference (Name t) else Nothing
--- 
--- mapPrimaryType :: PrimaryType -> T.Type
--- mapPrimaryType TBoolean = IntegerType 1
--- mapPrimaryType TByte = IntegerType 8
--- mapPrimaryType TShort = IntegerType 16
--- mapPrimaryType TInt = IntegerType 32
--- mapPrimaryType TLong = IntegerType 64
--- mapPrimaryType TFloat = FloatingPointType 32 IEEE
--- mapPrimaryType TDouble = FloatingPointType 64 IEEE
--- 
--- mapParameter :: AST.Parameter -> Codegen (Maybe G.Parameter)
--- mapParameter param = do
---     t <- mapType . paramType $ param
---     return $ if isNothing t then Nothing else Just $ G.Parameter (fromJust t) (Name . paramName $ param) []
---     
--- 
--- genMethod :: Class -> Method -> Codegen (Maybe Global)
--- genMethod cls mth = do
---     maybeFuncType <- mapMethodType cls . methodType $ mth
---     if isNothing maybeFuncType then return Nothing else do
---         let funcType = fromJust maybeFuncType
---         return . Just $ functionDefaults
---             { returnType = funcType
---             }
+    return A.defaultModule { A.moduleDefinitions = allDefs }
