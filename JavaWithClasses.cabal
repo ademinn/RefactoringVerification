@@ -25,7 +25,7 @@ executable main
   main-is:          Main.hs
   hs-source-dirs:   src
   extensions:       TypeSynonymInstances, FlexibleInstances, MultiParamTypeClasses, FunctionalDependencies, FlexibleContexts
-  build-depends:    base >=4.5, array >=0.4, strict >=0.3, mtl, containers, llvm-general-pure, llvm-general
+  build-depends:    base >=4.5, array >=0.4, strict >=0.3, mtl, containers, llvm-general-pure, llvm-general ==3.4.2.2
   other-modules:    Lexer, Parser, Codegen, Scope, Type, Checker, Analyzer
 
 test-suite main-suite

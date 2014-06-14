@@ -24,8 +24,6 @@ import AST
 import Analyzer
 import Type
 
-import System.IO.Unsafe
-
 data CodegenState
     = CodegenState
     { csProgram :: Maybe Program
@@ -45,7 +43,7 @@ defaultCodegenState = CodegenState
     , csScope = []
     , csClass = Nothing
     , csMethod = Nothing
-    , lastInd = 0
+    , lastInd = -1
     , instructions = []
     , structSizes = Map.empty
     , lastLabel = 0
@@ -136,7 +134,6 @@ addNamedInstr n instr = do
 addInstr :: I.Instruction -> Codegen A.Operand
 addInstr instr = do
     n <- nextName
-    let s = unsafePerformIO $ putStrLn $ show n ++ " = " ++ show instr
     addNamedInstr n instr
 
 addVoidInstr :: I.Instruction -> Codegen ()
@@ -550,9 +547,12 @@ genStatement (WhileStatement st) = Left <$> genWhile st
 genStatement (ForStatement st) = Left <$> genFor st
 genStatement (Return mExpr) = do
     retLabel <- nextLabel "Ret"
-    Right . toList . emptyBlock retLabel . flip I.Ret [] <$> case mExpr of
-        Nothing -> return Nothing
-        Just expr -> (Just . snd . fromJust) <$> genExpression expr
+    case mExpr of
+        Nothing -> return . Right . toList . emptyBlock retLabel $ I.Ret Nothing []
+        Just expr -> do
+            op <- (snd .fromJust ) <$> genExpression expr
+            instr <- popInstructions
+            return . Right . toList $ A.BasicBlock retLabel instr $ I.Do $ I.Ret (Just op) []
 genStatement Break = do
     l <- lastLoopEnd
     breakLabel <- nextLabel "Break"
@@ -576,7 +576,7 @@ genBlockStatement (BlockVD v) = do
 genBlockStatement (Statement st) = genStatement st
 
 joinEStatements :: [EStatement] -> EStatement
-joinEStatements [] = Left $ \_ -> []
+joinEStatements [] = Left $ const []
 joinEStatements l = case last l of
     (Right b) -> Right $ foldESt b $ init l
     _ -> Left $ \finBlock -> foldESt [finBlock] l
@@ -607,7 +607,7 @@ mapParam (Parameter t n) = G.Parameter (mapType t) (A.Name n) []
 
 genMethod :: Method -> Codegen A.Definition
 genMethod mth@(Method mt _ mp b) = do
-    modify $ \s -> s { lastInd = 0, lastLabel = 0, csMethod = Just mth }
+    modify $ \s -> s { lastInd = -1, lastLabel = 0, csMethod = Just mth }
     addScope
     curClass <- getClassM
     let params = Parameter (ObjectType . className $ curClass) "this" : mp
