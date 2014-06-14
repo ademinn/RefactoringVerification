@@ -9,6 +9,7 @@ import qualified LLVM.General.AST.CallingConvention as CC
 import qualified LLVM.General.AST.IntegerPredicate as IP
 import qualified LLVM.General.AST.FloatingPointPredicate as FPP
 import qualified LLVM.General.AST.AddrSpace as AddrSpace
+import qualified LLVM.General.AST.Global as G
 
 import Control.Applicative
 import Control.Monad.State
@@ -345,10 +346,10 @@ genQualifiedName (New ot params) = do
     instr <- callMethod ot mth ptr paramsOp
     retOp <- addInstr instr
     return $ Just (ObjectType ot, retOp)
-genQualifiedName This = do
-    cls <- getClassM
-    let op = A.LocalReference $ A.Name "this"
-    return $ Just (ObjectType . className $ cls, op)
+genQualifiedName This = genQualifiedName (Var "this")
+--    cls <- getClassM
+--    let op = A.LocalReference $ A.Name "this"
+--    return $ Just (ObjectType . className $ cls, op)
 
 nextLabel :: String -> Codegen A.Name
 nextLabel l = do
@@ -504,6 +505,9 @@ genFor (For fInit cond inc st) = do
 toList :: a -> [a]
 toList a = [a]
 
+genBrBlock :: A.Name -> [A.Named I.Instruction] -> A.BasicBlock -> [A.BasicBlock]
+genBrBlock n instr finBlock = let finBlockName = getBBName finBlock in [brBlock n finBlockName instr]
+
 genStatement :: Statement -> Codegen EStatement
 genStatement (SubBlock b) = genBlock b
 genStatement (IfStatement st) = genIf st
@@ -526,18 +530,63 @@ genStatement (ExpressionStatement expr) = do
     void $ genExpression expr
     instr <- popInstructions
     exprLabel <- nextLabel "Expression"
-    return . Left $ \finBlock ->
-        let finBlockName = getBBName finBlock in
-        [brBlock exprLabel finBlockName instr]
+    return . Left $ genBrBlock exprLabel instr
 
 genBlockStatement :: BlockStatement -> Codegen EStatement
-genBlockStatement _ = undefined
+genBlockStatement (BlockVD v) = do
+    genVariable v
+    instr <- popInstructions
+    vdLabel <- nextLabel "VarDeclaration"
+    return . Left $ genBrBlock vdLabel instr
+genBlockStatement (Statement st) = genStatement st
+
+joinEStatements :: [EStatement] -> EStatement
+joinEStatements l = case l of
+    (Right b : ls) -> Right $ foldESt b ls
+    _ -> Left $ \finBlock -> foldESt [finBlock] l
+    where
+        joinESt est bl = case est of
+            Left f -> (f . head $ bl) ++ bl
+            Right bl' -> bl' ++ bl
+        foldESt = foldr joinESt
 
 genBlock :: Block -> Codegen EStatement
-genBlock _ = undefined
+genBlock bs = do
+    addScope
+    res <- joinEStatements <$> forM bs genBlockStatement
+    removeScope
+    return res
 
-genMethod :: Method -> Codegen A.Definition
-genMethod _ = undefined
+genParam :: Parameter -> Codegen ()
+genParam (Parameter t n) = do
+    ptr <- addInstr $ alloca . mapType $ t
+    store ptr $ A.LocalReference $ A.Name n
+    void $ newLocalVar n (t, ptr)
+
+genParams :: [Parameter] -> Codegen ()
+genParams params = forM_ params genParam
+
+mapParam :: Parameter -> G.Parameter
+mapParam (Parameter t n) = G.Parameter (mapType t) (A.Name n) []
+
+genMethod :: Method -> EStatement -> Codegen A.Definition
+genMethod mth@(Method mt _ mp b) preInit = do
+    curClass <- getClassM
+    let params = Parameter (ObjectType . className $ curClass) "this" : mp
+    forM_ params genParam
+    instr <- popInstructions
+    mthInitLabel <- nextLabel "MethodInit"
+    blockESt <- genBlock b
+    mthRet <- nextLabel "MethodExit"
+    let initESt = Left $ genBrBlock mthInitLabel instr
+        est = [preInit, initESt, blockESt] ++ [Right [emptyBlock mthRet $ I.Ret Nothing []] | mt == Void]
+        mthBlocks = fromRight . joinEStatements $ est
+    return . A.GlobalDefinition $ G.functionDefaults
+        { G.returnType = mapMethodType curClass mt
+        , G.name = A.Name $ genMethodName (className curClass) mth
+        , G.parameters = (map mapParam params, False)
+        , G.basicBlocks = mthBlocks
+        }
 
 genPreInit :: Class -> Codegen [A.Named I.Instruction]
 genPreInit _ = undefined
