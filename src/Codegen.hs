@@ -24,6 +24,8 @@ import AST
 import Analyzer
 import Type
 
+import System.IO.Unsafe
+
 data CodegenState
     = CodegenState
     { csProgram :: Maybe Program
@@ -35,6 +37,19 @@ data CodegenState
     , structSizes :: Map.Map ObjectType A.Operand
     , lastLabel :: Word
     , loops :: [(A.Name, A.Name)]
+    } deriving Show
+
+defaultCodegenState :: CodegenState
+defaultCodegenState = CodegenState
+    { csProgram = Nothing
+    , csScope = []
+    , csClass = Nothing
+    , csMethod = Nothing
+    , lastInd = 0
+    , instructions = []
+    , structSizes = Map.empty
+    , lastLabel = 0
+    , loops = []
     }
 
 instance Scoped CodegenState (Type, A.Operand) where
@@ -83,6 +98,19 @@ literalToOp l = A.ConstantOperand $ f l
         f (LFloat i) = C.Float $ F.Single i
         f (LDouble i) = C.Float $ F.Double i
 
+nullPrimaryValue :: PrimaryType -> Literal
+nullPrimaryValue TBoolean = LBoolean False 
+nullPrimaryValue TInt = LInt 0
+nullPrimaryValue TLong = LLong 0
+nullPrimaryValue TFloat = LFloat 0.0
+nullPrimaryValue TDouble = LDouble 0.0
+nullPrimaryValue _ = error "null primary value"
+
+nullValue :: Type -> Expression
+nullValue (ObjectType _) = Null
+nullValue (PrimaryType pt) = Literal $ nullPrimaryValue pt
+nullValue NullType = error "null value"
+
 mapType :: Type -> T.Type
 mapType (PrimaryType t) = mapPrimaryType t
 mapType (ObjectType t) = getPointerType . T.NamedTypeReference . A.Name $ t
@@ -108,14 +136,15 @@ addNamedInstr n instr = do
 addInstr :: I.Instruction -> Codegen A.Operand
 addInstr instr = do
     n <- nextName
+    let s = unsafePerformIO $ putStrLn $ show n ++ " = " ++ show instr
     addNamedInstr n instr
 
 addVoidInstr :: I.Instruction -> Codegen ()
 addVoidInstr instr = modify $ \s -> s { instructions = instructions s ++ [A.Do instr] }
 
-fromRight :: Either a b -> b
-fromRight (Right a) = a
-fromRight (Left _) = error "fromRight"
+fromRight :: String -> Either a b -> b
+fromRight _ (Right b) = b
+fromRight err (Left _) = error $ "fromRight " ++ err
 
 objType :: Type -> ObjectType
 objType (ObjectType t) = t
@@ -142,8 +171,11 @@ castPrimatyTypeOperand (ot, op) t = if ot == t then return op else addInstr $ f 
         f TDouble = I.FPExt
         f _ = error "cast primary type operand"
 
+nullConstant :: ObjectType -> A.Operand
+nullConstant t = A.ConstantOperand $ C.Null $ mapType $ ObjectType t
+
 castOperand :: (Type, A.Operand) -> Type -> Codegen A.Operand
-castOperand (NullType, _) (ObjectType t) = return . A.ConstantOperand $ C.Null $ mapType $ ObjectType t
+castOperand (NullType, _) (ObjectType t) = return . nullConstant $ t
 castOperand (PrimaryType pt, op) (PrimaryType t) = castPrimatyTypeOperand (pt, op) t
 castOperand (ObjectType ot, op) (ObjectType t) = if ot == t then return op else error "cast operand"
 castOperand _ _ = error "cast operand"
@@ -302,7 +334,9 @@ callMethod obj mth this params = do
     return $ call (genMethodName obj mth) $ this : paramsOp
 
 sizeof :: ObjectType -> Codegen A.Operand
-sizeof n = gets $ fromJust . Map.lookup n . structSizes
+sizeof n = do
+    s' <- addInstr $ I.GetElementPtr False (nullConstant n) [oneOp $ PrimaryType TInt] []
+    addInstr $ I.PtrToInt s' (T.IntegerType structPtrSize) []
 
 new :: ObjectType -> Codegen A.Operand
 new obj = do
@@ -317,14 +351,15 @@ genQualifiedName :: QualifiedName -> Codegen (Maybe (Type, A.Operand))
 genQualifiedName (FieldAccess qn field) = do
     (t', op) <- fromJust <$> genQualifiedName qn
     let t = objType t'
-    (ft, i) <- fromRight <$> findField t field
-    retOp <- addInstr $ I.GetElementPtr False op [structFieldAddr i] []
+    (ft, i) <- fromRight "field access" <$> findField t field
+    op' <- load op
+    retOp <- addInstr $ I.GetElementPtr False op' [structFieldAddr 0, structFieldAddr i] []
     return $ Just (ft, retOp) 
 genQualifiedName (MethodCall qn mthName params) = do
     (t', op) <- fromJust <$> genQualifiedName qn
     let t = objType t'
     paramsOp <- fmap (map fromJust) . mapM genExpression $ params
-    mth <- fromRight <$> findMethod t mthName (fst $ unzip paramsOp) (\m -> methodType m /= Constructor)
+    mth <- fromRight "method call" <$> findMethod t mthName (fst $ unzip paramsOp) (\m -> methodType m /= Constructor)
     instr <- callMethod t mth op paramsOp
     case methodType mth of
         Void -> do
@@ -341,7 +376,7 @@ genQualifiedName (Var var) = do
         Nothing -> genQualifiedName $ FieldAccess This var
 genQualifiedName (New ot params) = do
     paramsOp <- fmap (map fromJust) . mapM genExpression $ params
-    mth <- fromRight <$> findMethod ot ot (fst $ unzip paramsOp) (\m -> methodType m == Constructor)
+    mth <- fromRight "new" <$> findMethod ot ot (fst $ unzip paramsOp) (\m -> methodType m == Constructor)
     ptr <- new ot
     instr <- callMethod ot mth ptr paramsOp
     retOp <- addInstr instr
@@ -541,8 +576,9 @@ genBlockStatement (BlockVD v) = do
 genBlockStatement (Statement st) = genStatement st
 
 joinEStatements :: [EStatement] -> EStatement
-joinEStatements l = case l of
-    (Right b : ls) -> Right $ foldESt b ls
+joinEStatements [] = Left $ \_ -> []
+joinEStatements l = case last l of
+    (Right b) -> Right $ foldESt b $ init l
     _ -> Left $ \finBlock -> foldESt [finBlock] l
     where
         joinESt est bl = case est of
@@ -569,18 +605,23 @@ genParams params = forM_ params genParam
 mapParam :: Parameter -> G.Parameter
 mapParam (Parameter t n) = G.Parameter (mapType t) (A.Name n) []
 
-genMethod :: Method -> EStatement -> Codegen A.Definition
-genMethod mth@(Method mt _ mp b) preInit = do
+genMethod :: Method -> Codegen A.Definition
+genMethod mth@(Method mt _ mp b) = do
+    modify $ \s -> s { lastInd = 0, lastLabel = 0, csMethod = Just mth }
+    addScope
     curClass <- getClassM
     let params = Parameter (ObjectType . className $ curClass) "this" : mp
     forM_ params genParam
     instr <- popInstructions
     mthInitLabel <- nextLabel "MethodInit"
-    blockESt <- genBlock b
+    fieldsInit <- if mt == Constructor then genFieldsInit else return . Right $ []
+    let b' = b ++ [Statement . Return . Just . QN $ This | mt == Constructor]
+    blockESt <- genBlock b'
     mthRet <- nextLabel "MethodExit"
     let initESt = Left $ genBrBlock mthInitLabel instr
-        est = [preInit, initESt, blockESt] ++ [Right [emptyBlock mthRet $ I.Ret Nothing []] | mt == Void]
-        mthBlocks = fromRight . joinEStatements $ est
+        est = [initESt, fieldsInit, blockESt] ++ [Right [emptyBlock mthRet $ I.Ret Nothing []] | mt == Void]
+        mthBlocks = fromRight "genMethod join" . joinEStatements $ est
+    removeScope
     return . A.GlobalDefinition $ G.functionDefaults
         { G.returnType = mapMethodType curClass mt
         , G.name = A.Name $ genMethodName (className curClass) mth
@@ -588,14 +629,30 @@ genMethod mth@(Method mt _ mp b) preInit = do
         , G.basicBlocks = mthBlocks
         }
 
-genPreInit :: Class -> Codegen [A.Named I.Instruction]
-genPreInit _ = undefined
+genField :: Variable -> Codegen ()
+genField (Variable vt vn ve) = do
+    let expr = fromMaybe (nullValue vt) ve 
+    void $ genExpression $ Assign (FieldAccess This vn) expr
+
+genFieldsInit :: Codegen EStatement
+genFieldsInit = do
+    cls <- getClassM
+    forM_ (classFields cls) genField
+    instr <- popInstructions
+    fieldInitLabel <- nextLabel "FieldsInit"
+    return . Left $ genBrBlock fieldInitLabel instr
+
+genStruct :: Class -> A.Definition
+genStruct (Class name fields _) = A.TypeDefinition (A.Name name) $
+    Just $ T.StructureType False $ map (mapType . varType) fields
 
 genClass :: Class -> Codegen [A.Definition]
 genClass cls = do
     modify $ \s -> s { csClass = Just cls }
+    let struct = genStruct cls
+    methods <- forM (classMethods cls) genMethod
     modify $ \s -> s { csClass = Nothing }
-    return []
+    return $ struct : methods
 
 genProgram :: Program -> Codegen A.Module
 genProgram p = do
