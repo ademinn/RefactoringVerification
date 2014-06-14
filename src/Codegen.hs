@@ -8,6 +8,7 @@ import qualified LLVM.General.AST.Instruction as I
 import qualified LLVM.General.AST.CallingConvention as CC
 import qualified LLVM.General.AST.IntegerPredicate as IP
 import qualified LLVM.General.AST.FloatingPointPredicate as FPP
+import qualified LLVM.General.AST.AddrSpace as AddrSpace
 
 import Control.Applicative
 import Control.Monad.State
@@ -32,6 +33,7 @@ data CodegenState
     , instructions :: [A.Named I.Instruction]
     , structSizes :: Map.Map ObjectType A.Operand
     , lastLabel :: Word
+    , loops :: [(A.Name, A.Name)]
     }
 
 instance Scoped CodegenState (Type, A.Operand) where
@@ -48,6 +50,18 @@ instance WithMethod CodegenState where
     getMethod = fromJust . csMethod
 
 type Codegen a = State CodegenState a
+
+addLoop :: (A.Name, A.Name) -> Codegen ()
+addLoop n = modify $ \s -> s { loops = n : loops s }
+
+removeLoop :: Codegen ()
+removeLoop = modify $ \s -> s { loops = tail . loops $ s }
+
+lastLoopEnd :: Codegen A.Name
+lastLoopEnd = gets $ snd . head . loops
+
+lastLoopNext :: Codegen A.Name
+lastLoopNext = gets $ fst . head . loops
 
 mapPrimaryType :: PrimaryType -> T.Type
 mapPrimaryType TBoolean = T.IntegerType 1
@@ -70,7 +84,7 @@ literalToOp l = A.ConstantOperand $ f l
 
 mapType :: Type -> T.Type
 mapType (PrimaryType t) = mapPrimaryType t
-mapType (ObjectType t) = T.NamedTypeReference (A.Name t) 
+mapType (ObjectType t) = getPointerType . T.NamedTypeReference . A.Name $ t
 mapType NullType = error "mapType"
 
 mapMethodType :: Class -> MethodType -> T.Type
@@ -85,11 +99,15 @@ nextName = do
     modify $ \s -> s { lastInd = i' }
     return $ A.UnName i'
 
+addNamedInstr :: A.Name -> I.Instruction -> Codegen A.Operand
+addNamedInstr n instr = do
+    modify $ \s -> s { instructions = instructions s ++ [n A.:= instr] }
+    return $ A.LocalReference n
+
 addInstr :: I.Instruction -> Codegen A.Operand
 addInstr instr = do
     n <- nextName
-    modify $ \s -> s { instructions = instructions s ++ [n A.:= instr] }
-    return $ A.LocalReference n
+    addNamedInstr n instr
 
 addVoidInstr :: I.Instruction -> Codegen ()
 addVoidInstr instr = modify $ \s -> s { instructions = instructions s ++ [A.Do instr] }
@@ -107,6 +125,9 @@ structPtrSize = 32
 
 alignment :: Word32
 alignment = 0
+
+getPointerType :: T.Type -> T.Type
+getPointerType t = T.PointerType t $ AddrSpace.AddrSpace 0
 
 structFieldAddr :: Int -> A.Operand
 structFieldAddr i = A.ConstantOperand . C.Int structPtrSize $ toInteger i
@@ -286,7 +307,10 @@ new :: ObjectType -> Codegen A.Operand
 new obj = do
     size <- sizeof obj
     ptr <- addInstr $ call "malloc" [size]
-    addInstr $ I.BitCast ptr (A.NamedTypeReference . A.Name $ obj) []
+    addInstr $ I.BitCast ptr (getPointerType . A.NamedTypeReference . A.Name $ obj) []
+
+alloca :: T.Type -> I.Instruction
+alloca t = I.Alloca t Nothing alignment []
 
 genQualifiedName :: QualifiedName -> Codegen (Maybe (Type, A.Operand))
 genQualifiedName (FieldAccess qn field) = do
@@ -387,6 +411,9 @@ getExpressionRes e = do
     calc <- popInstructions
     return (op, calc)
 
+emptyBlock :: A.Name -> I.Terminator -> A.BasicBlock
+emptyBlock n t = A.BasicBlock n [] $ A.Do t
+
 genIf :: If -> Codegen EStatement
 genIf (If cond cons alt) = do
     ifLabel <- nextLabel "If"
@@ -412,22 +439,37 @@ genWhile :: While -> Codegen (A.BasicBlock -> [A.BasicBlock])
 genWhile (While cond st) = do
     whileLabel <- nextLabel "While"
     lastBlock <- goToBlock whileLabel
+    endWhileLabel <- nextLabel "EndWhile"
+    addLoop (getBBName lastBlock, endWhileLabel)
     (flag, calcFlag) <- getExpressionRes cond
     stBlocks' <- genStatement st
     let stBlocks = case stBlocks' of
             Left f -> f lastBlock
             Right b -> b
         stBlockName = getBBName . head $ stBlocks
+    removeLoop
     return $ \finBlock ->
         let finBlockName = getBBName finBlock in
-        [A.BasicBlock whileLabel calcFlag (I.Do $ I.CondBr flag stBlockName finBlockName [])] ++ stBlocks ++ [lastBlock]
+        let endWhile = emptyBlock endWhileLabel $ I.Br finBlockName [] in
+        [A.BasicBlock whileLabel calcFlag (I.Do $ I.CondBr flag stBlockName endWhileLabel [])] ++ stBlocks ++ [lastBlock, endWhile]
 
 genExpressionList :: [Expression] -> Codegen ()
 genExpressionList = mapM_ genExpression
 
+genVariable :: Variable -> Codegen ()
+genVariable (Variable t n e) = do
+    ptr <- addNamedInstr (A.Name n) . alloca . mapType $ t
+    void $ newLocalVar n (t, ptr)
+    case e of
+        Just expr -> do
+            eRes <- fromJust <$> genExpression expr
+            eOp <- castOperand eRes t
+            store ptr eOp
+        Nothing -> return ()
+
 genForInit :: ForInit -> Codegen ()
 genForInit (ForInitEL l) = genExpressionList l
-genForInit _ = undefined
+genForInit (ForInitVD v) = genVariable v
 
 brBlock :: A.Name -> A.Name -> [A.Named I.Instruction] -> A.BasicBlock
 brBlock name next instr = A.BasicBlock name instr $ I.Do $ I.Br next []
@@ -436,12 +478,14 @@ genFor :: For -> Codegen (A.BasicBlock -> [A.BasicBlock])
 genFor (For fInit cond inc st) = do
     addScope
     initLabel <- nextLabel "ForInit"
+    endForLabel <- nextLabel "EndFor"
+    forLabel <- nextLabel "For"
+    incLabel <- nextLabel "ForInc"
+    addLoop (incLabel, endForLabel)
     genForInit fInit
     calcInit <- popInstructions
-    forLabel <- nextLabel "For"
     (flag, calcFlag) <- getExpressionRes cond
     stBlocks' <- genStatement st
-    incLabel <- nextLabel "ForInc"
     genExpressionList inc
     calcInc <- popInstructions
     let initBlock = brBlock initLabel forLabel calcInit
@@ -450,16 +494,47 @@ genFor (For fInit cond inc st) = do
             Left f -> f incBlock
             Right b -> b
         stBlockName = getBBName . head $ stBlocks
+    removeLoop
     removeScope
     return $ \finBlock ->
         let finBlockName = getBBName finBlock in
-        [initBlock] ++ [A.BasicBlock forLabel calcFlag (I.Do $ I.CondBr flag stBlockName finBlockName [])] ++ stBlocks ++ [incBlock]
+        let endFor = emptyBlock endForLabel $ I.Br finBlockName [] in
+        [initBlock] ++ [A.BasicBlock forLabel calcFlag (I.Do $ I.CondBr flag stBlockName endForLabel [])] ++ stBlocks ++ [incBlock, endFor]
+
+toList :: a -> [a]
+toList a = [a]
 
 genStatement :: Statement -> Codegen EStatement
-genStatement _ = undefined
+genStatement (SubBlock b) = genBlock b
+genStatement (IfStatement st) = genIf st
+genStatement (WhileStatement st) = Left <$> genWhile st
+genStatement (ForStatement st) = Left <$> genFor st
+genStatement (Return mExpr) = do
+    retLabel <- nextLabel "Ret"
+    Right . toList . emptyBlock retLabel . flip I.Ret [] <$> case mExpr of
+        Nothing -> return Nothing
+        Just expr -> (Just . snd . fromJust) <$> genExpression expr
+genStatement Break = do
+    l <- lastLoopEnd
+    breakLabel <- nextLabel "Break"
+    return . Right . toList $ emptyBlock breakLabel $ I.Br l []
+genStatement Continue = do
+    l <- lastLoopNext
+    continueLabel <- nextLabel "Continue"
+    return . Right . toList $ emptyBlock continueLabel $ I.Br l []
+genStatement (ExpressionStatement expr) = do
+    void $ genExpression expr
+    instr <- popInstructions
+    exprLabel <- nextLabel "Expression"
+    return . Left $ \finBlock ->
+        let finBlockName = getBBName finBlock in
+        [brBlock exprLabel finBlockName instr]
 
-genBlockStatement :: BlockStatement -> Codegen [A.BasicBlock]
+genBlockStatement :: BlockStatement -> Codegen EStatement
 genBlockStatement _ = undefined
+
+genBlock :: Block -> Codegen EStatement
+genBlock _ = undefined
 
 genMethod :: Method -> Codegen A.Definition
 genMethod _ = undefined
