@@ -48,6 +48,8 @@ inferPrimary t1 t2 = case compare t1 t2 of
 
 infer :: Type -> Type -> Maybe Type
 infer (PrimaryType t1) (PrimaryType t2) = PrimaryType <$> inferPrimary t1 t2
+infer o@(ObjectType _) NullType = Just o
+infer NullType o@(ObjectType _) = Just o
 infer t1 t2 = if t1 == t2 then Just t1 else Nothing
 
 castPrimary :: PrimaryType -> PrimaryType -> Bool

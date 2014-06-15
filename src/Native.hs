@@ -6,6 +6,8 @@ import qualified LLVM.General.AST.Constant as C
 import qualified LLVM.General.AST.Instruction as I
 import qualified LLVM.General.AST.Global as G
 
+import Control.Applicative
+
 import Data.Char
 
 import Type
@@ -39,7 +41,7 @@ stringConstant :: String -> C.Constant
 stringConstant s = C.Array (T.IntegerType 8) $ map (C.Int 8 . toInteger . ord) s
 
 constants :: [(String, T.Type, C.Constant)]
-constants = [("%d", T.ArrayType 2 (T.IntegerType 8), stringConstant "%d")]
+constants = [("%d", T.ArrayType 3 (T.IntegerType 8), stringConstant "%d\n")]
 
 genWriteInt :: Codegen [A.BasicBlock]
 genWriteInt = do
@@ -65,3 +67,9 @@ genConsoleWriter = do
     cwcBlocks <- genConsoleWriterConstructor
     let cwc = genMethodDefinition cls consoleWriterConstructor cwcBlocks
     return $ globalVars ++ [struct, cwc, wi]
+
+nativeClasses :: [Class]
+nativeClasses = [consoleWriter]
+
+nativeDefinitions :: Codegen [A.Definition]
+nativeDefinitions = concat <$> sequence [genConsoleWriter]

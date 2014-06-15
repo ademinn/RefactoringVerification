@@ -75,3 +75,17 @@ findField typeName fieldName = do
         case mfl of
             Just fl -> Right (varType fl, fromJust . List.elemIndex fl $ classFields cls')
             Nothing -> Left $ "class " ++ typeName ++ " has no field " ++ fieldName
+
+emptyConstructor :: ObjectType -> Method
+emptyConstructor t = Method
+    { methodType = Constructor
+    , methodName = t
+    , methodParams = []
+    , methodBlock = []
+    }
+
+addEmptyConstructor :: Class -> Class
+addEmptyConstructor cls@(Class name _ mths) =
+    if null $ filter (\m -> methodType m == Constructor) mths
+        then cls { classMethods = emptyConstructor name : mths }
+        else cls

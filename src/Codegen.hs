@@ -16,6 +16,8 @@ import Data.Word
 import qualified Data.List as List
 import qualified Data.Map as Map
 
+import Debug.Trace
+
 import Scope
 import AST
 import Analyzer
@@ -221,8 +223,8 @@ brBlock name next instr = A.BasicBlock name instr $ I.Do $ I.Br next []
 toList :: a -> [a]
 toList a = [a]
 
-genBrBlock :: A.Name -> [A.Named I.Instruction] -> A.BasicBlock -> [A.BasicBlock]
-genBrBlock n instr finBlock = let finBlockName = getBBName finBlock in [brBlock n finBlockName instr]
+genBrBlock :: A.Name -> [A.Named I.Instruction] -> A.Name -> [A.BasicBlock]
+genBrBlock n instr finBlockName = [brBlock n finBlockName instr]
 
 genParam :: Parameter -> Codegen ()
 genParam (Parameter t n) = do
@@ -255,7 +257,7 @@ printfDecl = A.GlobalDefinition G.functionDefaults
     }
 
 genMethodDefinition :: Class -> Method -> [A.BasicBlock] -> A.Definition
-genMethodDefinition cls mth@(Method mt _ mp _) mthBlocks = A.GlobalDefinition G.functionDefaults
+genMethodDefinition cls mth@(Method mt _ mp _) mthBlocks = trace (unlines $ map (\b -> "-> " ++ show b) mthBlocks) $ A.GlobalDefinition G.functionDefaults
         { G.returnType = mapMethodType cls mt
         , G.name = A.Name $ genMethodName (className cls) mth
         , G.parameters = (map mapParam params, False)

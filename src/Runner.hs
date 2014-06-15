@@ -16,12 +16,12 @@ foreign import ccall "dynamic" haskFun :: FunPtr (IO ()) -> (IO ())
 run :: FunPtr a -> IO ()
 run f = haskFun (castFunPtr f :: FunPtr (IO ()))
 
-liftError :: ErrorT b IO a -> IO a
+liftError :: (Show b) => ErrorT b IO a -> IO a
 liftError err = do
     res <- runErrorT err
     case res of
-        Left _ -> error "err"
-        Right b -> return b
+        Left b -> error $ "err: " ++ show b
+        Right a -> return a
 
 assemblyExtension :: String
 assemblyExtension = ".ll"

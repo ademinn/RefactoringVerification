@@ -7,6 +7,7 @@ import Lexer
 import Checker
 import Generator
 import Codegen
+import Analyzer
 import Control.Applicative
 import Control.Monad.State
 import Control.Monad.Writer
@@ -44,7 +45,7 @@ main :: IO ()
 main = do
     args <- Env.getArgs
     withArgs args $ \s -> do
-        let p = parse . alexScanTokens $ s
+        let p = map addEmptyConstructor $ parse . alexScanTokens $ s
         case runIdentity . execWriterT . runStateT (check p) $ defaultAnalyzerState of
             [] -> do
                 let astModule = evalState (genProgram p) defaultCodegenState

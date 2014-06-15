@@ -20,7 +20,7 @@ import Type
 import Codegen
 import Native
 
-type EStatement = Either (A.BasicBlock -> [A.BasicBlock]) [A.BasicBlock]
+type EStatement = Either (A.Name -> [A.BasicBlock]) [A.BasicBlock]
 
 castPrimatyTypeOperand :: (PrimaryType, A.Operand) -> PrimaryType -> Codegen A.Operand
 castPrimatyTypeOperand (ot, op) t = if ot == t then return op else addInstr $ f t op (mapPrimaryType t) []
@@ -228,22 +228,21 @@ genIfConsAltOk ifLabel flag calcFlag consBlocks altBlocks = A.BasicBlock ifLabel
 
 genIfCons
     :: A.Name -> A.Operand -> [A.Named I.Instruction]
-    -> (A.BasicBlock -> [A.BasicBlock]) -> A.BasicBlock -> [A.BasicBlock]
-genIfCons ifLabel flag calcFlag getConsBlocks finBlock = A.BasicBlock ifLabel calcFlag (I.Do $ I.CondBr flag consBlockName finBlockName []) : consBlocks
+    -> (A.Name -> [A.BasicBlock]) -> A.Name -> [A.BasicBlock]
+genIfCons ifLabel flag calcFlag getConsBlocks finBlockName = A.BasicBlock ifLabel calcFlag (I.Do $ I.CondBr flag consBlockName finBlockName []) : consBlocks
     where
-        finBlockName = getBBName finBlock
-        consBlocks = getConsBlocks finBlock
+        consBlocks = getConsBlocks finBlockName
         consBlockName = getBBName . head $ consBlocks
 
 genIfConsAlt
     :: A.Name -> A.Operand -> [A.Named I.Instruction]
-    -> (A.BasicBlock -> [A.BasicBlock])
-    -> (A.BasicBlock -> [A.BasicBlock])
-    -> A.BasicBlock -> [A.BasicBlock]
-genIfConsAlt ifLabel flag calcFlag getConsBlocks getAltBlocks finBlock = genIfConsAltOk ifLabel flag calcFlag consBlocks altBlocks
+    -> (A.Name -> [A.BasicBlock])
+    -> (A.Name -> [A.BasicBlock])
+    -> A.Name -> [A.BasicBlock]
+genIfConsAlt ifLabel flag calcFlag getConsBlocks getAltBlocks finBlockName = genIfConsAltOk ifLabel flag calcFlag consBlocks altBlocks
     where
-        consBlocks = getConsBlocks finBlock
-        altBlocks = getAltBlocks finBlock
+        consBlocks = getConsBlocks finBlockName
+        altBlocks = getAltBlocks finBlockName
 
 getExpressionRes :: Expression -> Codegen (A.Operand, [A.Named I.Instruction])
 getExpressionRes e = do
@@ -272,7 +271,7 @@ genIf (If cond cons alt) = do
                 Left getAlt -> return . Left $ genIfConsAlt' (const consBlocks) getAlt
                 Right altBlocks -> return . Right $ genIfConsAltOk ifLabel flag calcFlag consBlocks altBlocks
 
-genWhile :: While -> Codegen (A.BasicBlock -> [A.BasicBlock])
+genWhile :: While -> Codegen (A.Name -> [A.BasicBlock])
 genWhile (While cond st) = do
     whileLabel <- nextLabel "While"
     lastBlock <- goToBlock whileLabel
@@ -281,12 +280,11 @@ genWhile (While cond st) = do
     (flag, calcFlag) <- getExpressionRes cond
     stBlocks' <- genStatement st
     let stBlocks = case stBlocks' of
-            Left f -> f lastBlock
+            Left f -> f $ getBBName lastBlock
             Right b -> b
         stBlockName = getBBName . head $ stBlocks
     removeLoop
-    return $ \finBlock ->
-        let finBlockName = getBBName finBlock in
+    return $ \finBlockName ->
         let endWhile = emptyBlock endWhileLabel $ I.Br finBlockName [] in
         [A.BasicBlock whileLabel calcFlag (I.Do $ I.CondBr flag stBlockName endWhileLabel [])] ++ stBlocks ++ [lastBlock, endWhile]
 
@@ -308,7 +306,7 @@ genForInit :: ForInit -> Codegen ()
 genForInit (ForInitEL l) = genExpressionList l
 genForInit (ForInitVD v) = genVariable v
 
-genFor :: For -> Codegen (A.BasicBlock -> [A.BasicBlock])
+genFor :: For -> Codegen (A.Name -> [A.BasicBlock])
 genFor (For fInit cond inc st) = do
     addScope
     initLabel <- nextLabel "ForInit"
@@ -325,13 +323,12 @@ genFor (For fInit cond inc st) = do
     let initBlock = brBlock initLabel forLabel calcInit
         incBlock = brBlock incLabel forLabel calcInc
         stBlocks = case stBlocks' of
-            Left f -> f incBlock
+            Left f -> f incLabel
             Right b -> b
         stBlockName = getBBName . head $ stBlocks
     removeLoop
     removeScope
-    return $ \finBlock ->
-        let finBlockName = getBBName finBlock in
+    return $ \finBlockName ->
         let endFor = emptyBlock endForLabel $ I.Br finBlockName [] in
         [initBlock] ++ [A.BasicBlock forLabel calcFlag (I.Do $ I.CondBr flag stBlockName endForLabel [])] ++ stBlocks ++ [incBlock, endFor]
 
@@ -374,10 +371,10 @@ joinEStatements :: [EStatement] -> EStatement
 joinEStatements [] = Left $ const []
 joinEStatements l = case last l of
     (Right b) -> Right $ foldESt b $ init l
-    _ -> Left $ \finBlock -> foldESt [finBlock] l
+    (Left f) -> Left $ \finBlockName -> foldESt (f finBlockName) $ init l
     where
         joinESt est bl =  case est of
-            Left f -> (f . head $ bl) ++ bl
+            Left f -> (f . getBBName . head $ bl) ++ bl
             Right bl' -> bl' ++ bl
         foldESt = foldr joinESt
 
@@ -430,11 +427,11 @@ genClass cls = do
 
 genProgram :: Program -> Codegen A.Module
 genProgram p = do
-    modify $ \s -> s { csProgram = Just $ consoleWriter : p }
+    modify $ \s -> s { csProgram = Just $ nativeClasses ++ p }
     defs <- concat <$> forM p genClass
     mainF <- mainFunc
-    cw <- genConsoleWriter
-    let allDefs = mallocDecl : printfDecl : mainF : (cw ++ defs)
+    nd <- nativeDefinitions
+    let allDefs = mallocDecl : printfDecl : mainF : (nd ++ defs)
     modify $ \s -> s { csProgram = Nothing }
     return A.defaultModule { A.moduleDefinitions = allDefs }
 

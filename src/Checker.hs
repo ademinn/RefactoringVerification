@@ -136,7 +136,7 @@ inferType t1 t2 = do
     let mt = infer t1 t2
     case mt of
         Just t -> return t
-        Nothing -> stopAnalyzer "Can not infer types"
+        Nothing -> stopAnalyzer $ "Can not infer types: " ++ show t1 ++ " " ++ show t2
 
 castType :: Type -> Type -> CheckerError ()
 castType t1 t2 = CM.unless (cast t1 t2) $ stopAnalyzer $ "Can't cast " ++ show t1 ++ " to " ++ show t2
@@ -184,6 +184,9 @@ checkIncDecOp qn = do
     t <- checkReturnQualifiedName qn
     checkNumericType t
 
+retBoolean :: CheckerError MethodType
+retBoolean = return . ReturnType . PrimaryType $ TBoolean
+
 checkExpression :: Expression -> CheckerError MethodType
 checkExpression (Assign qn expr) = do
     checkLValue qn
@@ -193,12 +196,12 @@ checkExpression (Assign qn expr) = do
     return . ReturnType $ q
 checkExpression (Or e1 e2) = checkBoolOp e1 e2
 checkExpression (And e1 e2) = checkBoolOp e1 e2
-checkExpression (Equal e1 e2) = checkEqOp e1 e2
-checkExpression (Ne e1 e2) = checkEqOp e1 e2
-checkExpression (Lt e1 e2) = checkNumericOp e1 e2
-checkExpression (Gt e1 e2) = checkNumericOp e1 e2
-checkExpression (Le e1 e2) = checkNumericOp e1 e2
-checkExpression (Ge e1 e2) = checkNumericOp e1 e2
+checkExpression (Equal e1 e2) = checkEqOp e1 e2 >> retBoolean
+checkExpression (Ne e1 e2) = checkEqOp e1 e2 >> retBoolean
+checkExpression (Lt e1 e2) = checkNumericOp e1 e2 >> retBoolean
+checkExpression (Gt e1 e2) = checkNumericOp e1 e2 >> retBoolean
+checkExpression (Le e1 e2) = checkNumericOp e1 e2 >> retBoolean
+checkExpression (Ge e1 e2) = checkNumericOp e1 e2 >> retBoolean
 checkExpression (Plus e1 e2) = checkNumericOp e1 e2
 checkExpression (Minus e1 e2) = checkNumericOp e1 e2
 checkExpression (Mul e1 e2) = checkNumericOp e1 e2
@@ -349,7 +352,7 @@ instance Checkable Class where
 
 instance Checkable Program where
     check p = do
-        modify $ \s -> s { maybeProgram = Just $ consoleWriter : p }
+        modify $ \s -> s { maybeProgram = Just $ nativeClasses ++ p }
         CM.mapM_ check p
         modify $ \s -> s { maybeProgram = Nothing }
 
