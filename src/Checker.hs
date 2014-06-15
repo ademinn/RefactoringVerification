@@ -14,6 +14,7 @@ import Scope
 import AST
 import Type
 import Analyzer
+import Native
 
 type FieldsIndexes = Map.Map String (Map.Map String Int)
 
@@ -348,7 +349,7 @@ instance Checkable Class where
 
 instance Checkable Program where
     check p = do
-        modify $ \s -> s { maybeProgram = Just p }
+        modify $ \s -> s { maybeProgram = Just $ consoleWriter : p }
         CM.mapM_ check p
         modify $ \s -> s { maybeProgram = Nothing }
 
