@@ -3,6 +3,7 @@ module Main where
 import Parser
 import Lexer
 import Checker
+import Generator
 import Codegen
 import Control.Applicative
 import Control.Monad.State

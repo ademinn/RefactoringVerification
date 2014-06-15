@@ -14,12 +14,12 @@ maintainer:          ademinn@gmail.com
 build-type:          Simple
 cabal-version:       >=1.8
 
-executable main
+executable hjavac
   main-is:          Main.hs
   hs-source-dirs:   src
   extensions:       TypeSynonymInstances, FlexibleInstances, MultiParamTypeClasses, FunctionalDependencies, FlexibleContexts
-  build-depends:    base >=4.5, array >=0.4, strict >=0.3, mtl, containers, llvm-general-pure ==3.4.2.2, llvm-general ==3.4.2.2
-  other-modules:    Lexer, Parser, Codegen, Scope, Type, Checker, Analyzer, Native
+  build-depends:    base >=4.5, array >=0.4, strict >=0.3, mtl, containers, llvm-general-pure ==3.4.2.2, llvm-general
+  other-modules:    Lexer, Parser, Codegen, Scope, Type, Checker, Analyzer, Native, Generator
 
 test-suite main-suite
   type:             exitcode-stdio-1.0
