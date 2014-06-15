@@ -242,22 +242,8 @@ genStruct :: Class -> A.Definition
 genStruct (Class name fields _) = A.TypeDefinition (A.Name name) $
     Just $ T.StructureType False $ map (mapType . varType) fields
 
-mallocDecl :: A.Definition
-mallocDecl = A.GlobalDefinition G.functionDefaults
-    { G.returnType = T.PointerType (T.IntegerType 8) addrSpace
-    , G.name = A.Name "malloc"
-    , G.parameters = ([G.Parameter (T.IntegerType 32) (A.Name "size") []], False)
-    }
-
-printfDecl :: A.Definition
-printfDecl = A.GlobalDefinition G.functionDefaults
-    { G.returnType = T.IntegerType 32
-    , G.name = A.Name "printf"
-    , G.parameters = ([G.Parameter (getPointerType $ T.IntegerType 8) (A.Name "format") []], True)
-    }
-
 genMethodDefinition :: Class -> Method -> [A.BasicBlock] -> A.Definition
-genMethodDefinition cls mth@(Method mt _ mp _) mthBlocks = trace (unlines $ map (\b -> "-> " ++ show b) mthBlocks) $ A.GlobalDefinition G.functionDefaults
+genMethodDefinition cls mth@(Method mt _ mp _) mthBlocks = A.GlobalDefinition G.functionDefaults
         { G.returnType = mapMethodType cls mt
         , G.name = A.Name $ genMethodName (className cls) mth
         , G.parameters = (map mapParam params, False)

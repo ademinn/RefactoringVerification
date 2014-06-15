@@ -23,13 +23,14 @@ import Native
 type EStatement = Either (A.Name -> [A.BasicBlock]) [A.BasicBlock]
 
 castPrimatyTypeOperand :: (PrimaryType, A.Operand) -> PrimaryType -> Codegen A.Operand
-castPrimatyTypeOperand (ot, op) t = if ot == t then return op else addInstr $ f t op (mapPrimaryType t) []
+castPrimatyTypeOperand (ot, op) t = if ot == t then return op else addInstr $ f ot t op (mapPrimaryType t) []
     where
-        f TInt = I.SExt
-        f TLong = I.SExt
-        f TFloat = I.FPExt
-        f TDouble = I.FPExt
-        f _ = error "cast primary type operand"
+        f _ TInt = I.SExt
+        f _ TLong = I.SExt
+        f _ TFloat = I.SIToFP
+        f TFloat TDouble = I.FPExt
+        f _ TDouble = I.SIToFP
+        f _ _ = error "cast primary type operand"
 
 castOperand :: (Type, A.Operand) -> Type -> Codegen A.Operand
 castOperand (NullType, _) (ObjectType t) = return . nullConstant $ t
@@ -431,7 +432,7 @@ genProgram p = do
     defs <- concat <$> forM p genClass
     mainF <- mainFunc
     nd <- nativeDefinitions
-    let allDefs = mallocDecl : printfDecl : mainF : (nd ++ defs)
+    let allDefs = mainF : (nd ++ defs)
     modify $ \s -> s { csProgram = Nothing }
     return A.defaultModule { A.moduleDefinitions = allDefs }
 

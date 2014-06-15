@@ -270,7 +270,7 @@ instance Checkable Variable where
         i <- case expr of
             Just e -> do
                 ifOkExpr e $ \mt -> case mt of
-                    ReturnType t' -> CM.unless (t == t') $ newError $ "Type mismatch: " ++ show t ++ " != " ++ show t'
+                    ReturnType t' -> CM.unless (cast t' t) $ newError $ "Type mismatch: " ++ show t ++ " != " ++ show t'
                     _ -> newError "Cannot assign void"
                 return True
             Nothing -> return False
