@@ -49,9 +49,9 @@ data Statement
     | IfStatement If
     | WhileStatement While
     | ForStatement For
-    | Return (Maybe Expression)
-    | Break
-    | Continue
+    | Return (Maybe Expression) Int
+    | Break Int
+    | Continue Int
     | ExpressionStatement Expression
     deriving (Eq, Show)
 
@@ -82,7 +82,10 @@ data For
 data ForInit = ForInitVD Variable | ForInitEL [Expression]
     deriving (Eq, Show)
 
-data Expression
+data Expression = Expr ExpressionS Int
+    deriving (Eq, Show)
+
+data ExpressionS
     = Assign QualifiedName Expression
     | Or Expression Expression
     | And Expression Expression
@@ -109,7 +112,10 @@ data Expression
     | Null
     deriving (Eq, Show)
 
-data QualifiedName
+data QualifiedName = QName QualifiedNameS Int
+    deriving (Eq, Show)
+
+data QualifiedNameS
     = FieldAccess QualifiedName String
     | MethodCall QualifiedName String [Expression]
     | Var String

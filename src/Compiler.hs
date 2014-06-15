@@ -2,8 +2,9 @@ module Main where
 
 import qualified System.Environment as Env
 
+import qualified Lexer as L
+
 import Parser
-import Lexer
 import Checker
 import Generator
 import Codegen
@@ -45,13 +46,19 @@ main :: IO ()
 main = do
     args <- Env.getArgs
     withArgs args $ \s -> do
-        let p = map addEmptyConstructor $ fromRight "" $ runAlex s parse
-        case runIdentity . execWriterT . runStateT (check p) $ defaultAnalyzerState of
-            [] -> do
-                let astModule = evalState (genProgram p) defaultCodegenState
-                C.withContext $ \context ->
-                    liftError $ M.withModuleFromAST context astModule $ \m ->
-                        Just <$> M.moduleLLVMAssembly m
-            l -> do
-                putStrLn $ unlines l
+        let parseRes = L.runAlex s parse
+        case parseRes of
+            Left err -> do
+                putStrLn err
                 return Nothing
+            Right p' -> do
+                let p = map addEmptyConstructor p'
+                case runIdentity . execWriterT . runStateT (check p) $ defaultAnalyzerState of
+                    [] -> do
+                        let astModule = evalState (genProgram p) defaultCodegenState
+                        C.withContext $ \context ->
+                            liftError $ M.withModuleFromAST context astModule $ \m ->
+                                Just <$> M.moduleLLVMAssembly m
+                    l -> do
+                        putStrLn $ unlines l
+                        return Nothing

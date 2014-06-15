@@ -113,8 +113,8 @@ nullPrimaryValue TDouble = LDouble 0.0
 nullPrimaryValue _ = error "null primary value"
 
 nullValue :: Type -> Expression
-nullValue (ObjectType _) = Null
-nullValue (PrimaryType pt) = Literal $ nullPrimaryValue pt
+nullValue (ObjectType _) = Expr Null 0
+nullValue (PrimaryType pt) = Expr (Literal $ nullPrimaryValue pt) 0
 nullValue NullType = error "null value"
 
 mapType :: Type -> T.Type

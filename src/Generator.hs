@@ -127,44 +127,44 @@ genPostOp qn f = do
     return $ Just (t, val)
 
 genExpression :: Expression -> Codegen (Maybe (Type, A.Operand))
-genExpression (Assign qn expr) = do
+genExpression (Expr (Assign qn expr) _) = do
     (qType, qPtr) <- fromJust <$> genQualifiedName qn
     eRes <- fromJust <$> genExpression expr
     val <- castOperand eRes qType
     store qPtr val
     return $ Just (qType, val)
-genExpression (Or e1 e2) = genBinaryOp e1 e2 $ \o1 o2 -> I.Or o1 o2 []
-genExpression (And e1 e2) = genBinaryOp e1 e2 $ \o1 o2 -> I.And o1 o2 []
-genExpression (Equal e1 e2) = genCmpOp e1 e2 IP.EQ FPP.OEQ
-genExpression (Ne e1 e2) = genCmpOp e1 e2 IP.NE FPP.ONE
-genExpression (Lt e1 e2) = genCmpOp e1 e2 IP.SLT FPP.OLT
-genExpression (Gt e1 e2) = genCmpOp e1 e2 IP.SGT FPP.OGT
-genExpression (Le e1 e2) = genCmpOp e1 e2 IP.SLE FPP.OLE
-genExpression (Ge e1 e2) = genCmpOp e1 e2 IP.SGE FPP.OGE
-genExpression (Plus e1 e2) = genArithmOp e1 e2 (I.Add False False) I.FAdd
-genExpression (Minus e1 e2) = genArithmOp e1 e2 (I.Sub False False) I.FSub
-genExpression (Mul e1 e2) = genArithmOp e1 e2 (I.Mul False False) I.FMul
-genExpression (Div e1 e2) = genArithmOp e1 e2 (I.SDiv False) I.FDiv
-genExpression (Mod e1 e2) = genArithmOp e1 e2 I.SRem I.FRem
-genExpression (Pos e1) = genExpression e1
-genExpression (Neg e1) = genExpression (Minus (Literal $ LInt 0) e1)
-genExpression (Not expr) = do
+genExpression (Expr (Or e1 e2) _) = genBinaryOp e1 e2 $ \o1 o2 -> I.Or o1 o2 []
+genExpression (Expr (And e1 e2) _) = genBinaryOp e1 e2 $ \o1 o2 -> I.And o1 o2 []
+genExpression (Expr (Equal e1 e2) _) = genCmpOp e1 e2 IP.EQ FPP.OEQ
+genExpression (Expr (Ne e1 e2) _) = genCmpOp e1 e2 IP.NE FPP.ONE
+genExpression (Expr (Lt e1 e2) _) = genCmpOp e1 e2 IP.SLT FPP.OLT
+genExpression (Expr (Gt e1 e2) _) = genCmpOp e1 e2 IP.SGT FPP.OGT
+genExpression (Expr (Le e1 e2) _) = genCmpOp e1 e2 IP.SLE FPP.OLE
+genExpression (Expr (Ge e1 e2) _) = genCmpOp e1 e2 IP.SGE FPP.OGE
+genExpression (Expr (Plus e1 e2) _) = genArithmOp e1 e2 (I.Add False False) I.FAdd
+genExpression (Expr (Minus e1 e2) _) = genArithmOp e1 e2 (I.Sub False False) I.FSub
+genExpression (Expr (Mul e1 e2) _) = genArithmOp e1 e2 (I.Mul False False) I.FMul
+genExpression (Expr (Div e1 e2) _) = genArithmOp e1 e2 (I.SDiv False) I.FDiv
+genExpression (Expr (Mod e1 e2) _) = genArithmOp e1 e2 I.SRem I.FRem
+genExpression (Expr (Pos e1) _) = genExpression e1
+genExpression (Expr (Neg e1) l) = genExpression $ Expr (Minus (Expr (Literal $ LInt 0) l) e1) l
+genExpression (Expr (Not expr) _) = do
     (t, eRes) <- fromJust <$> genExpression expr
     notE <- addInstr $ I.Sub False False (literalToOp $ LBoolean True) eRes []
     return $ Just (t, notE)
-genExpression (PreInc qn) = genPreOp qn I.Add
-genExpression (PreDec qn) = genPreOp qn I.Sub
-genExpression (PostInc qn) = genPostOp qn I.Add
-genExpression (PostDec qn) = genPostOp qn I.Sub
-genExpression (QN qn) = do
+genExpression (Expr (PreInc qn) _) = genPreOp qn I.Add
+genExpression (Expr (PreDec qn) _) = genPreOp qn I.Sub
+genExpression (Expr (PostInc qn) _) = genPostOp qn I.Add
+genExpression (Expr (PostDec qn) _) = genPostOp qn I.Sub
+genExpression (Expr (QN qn) _) = do
     qRes <- genQualifiedName qn
     case qRes of
         Nothing -> return Nothing
         Just (qType, qPtr) -> do
             qVal <- load qPtr
             return $ Just (qType, qVal)
-genExpression (Literal l) = return $ Just (PrimaryType $ literalType l, literalToOp l)
-genExpression Null = return $ Just (NullType, A.ConstantOperand $ C.Null T.VoidType)
+genExpression (Expr (Literal l) _) = return $ Just (PrimaryType $ literalType l, literalToOp l)
+genExpression (Expr Null _) = return $ Just (NullType, A.ConstantOperand $ C.Null T.VoidType)
 
 callMethod :: ObjectType -> Method -> A.Operand -> [(Type, A.Operand)] -> Codegen I.Instruction
 callMethod obj mth this params = do
@@ -172,14 +172,14 @@ callMethod obj mth this params = do
     return $ call (genMethodName obj mth) $ this : paramsOp
 
 genQualifiedName :: QualifiedName -> Codegen (Maybe (Type, A.Operand))
-genQualifiedName (FieldAccess qn field) = do
+genQualifiedName (QName (FieldAccess qn field) _) = do
     (t', op) <- fromJust <$> genQualifiedName qn
     let t = objType t'
     (ft, i) <- fromRight "field access" <$> findField t field
     op' <- load op
     retOp <- addInstr $ I.GetElementPtr False op' [structFieldAddr 0, structFieldAddr i] []
     return $ Just (ft, retOp) 
-genQualifiedName (MethodCall qn mthName params) = do
+genQualifiedName (QName (MethodCall qn mthName params) _) = do
     (t', op) <- fromJust <$> genQualifiedName qn
     op' <- load op
     let t = objType t'
@@ -196,12 +196,12 @@ genQualifiedName (MethodCall qn mthName params) = do
             ptr <- addInstr $ alloca (mapType rt)
             store ptr retOp
             return $ Just (rt, ptr)
-genQualifiedName (Var var) = do
+genQualifiedName (QName (Var var) l) = do
     mv <- lookupLocalVar var
     case mv of
         Just v -> return $ Just v
-        Nothing -> genQualifiedName $ FieldAccess This var
-genQualifiedName (New ot params) = do
+        Nothing -> genQualifiedName $ QName (FieldAccess (QName This l) var) l
+genQualifiedName (QName (New ot params) _) = do
     paramsOp <- fmap (map fromJust) . mapM genExpression $ params
     mth <- fromRight "new" <$> findMethod ot ot (fst $ unzip paramsOp) (\m -> methodType m == Constructor)
     ptr <- new ot
@@ -210,7 +210,7 @@ genQualifiedName (New ot params) = do
     ptr' <- addInstr . alloca . mapType $ ObjectType ot
     store ptr' retOp
     return $ Just (ObjectType ot, ptr')
-genQualifiedName This = genQualifiedName (Var "this")
+genQualifiedName (QName This l) = genQualifiedName $ QName (Var "this") l
 
 goToBlock :: A.Name -> Codegen A.BasicBlock
 goToBlock name = do
@@ -338,7 +338,7 @@ genStatement (SubBlock b) = genBlock b
 genStatement (IfStatement st) = genIf st
 genStatement (WhileStatement st) = Left <$> genWhile st
 genStatement (ForStatement st) = Left <$> genFor st
-genStatement (Return mExpr) = do
+genStatement (Return mExpr _) = do
     retLabel <- nextLabel "Ret"
     case mExpr of
         Nothing -> return . Right . toList . emptyBlock retLabel $ I.Ret Nothing []
@@ -346,11 +346,11 @@ genStatement (Return mExpr) = do
             op <- (snd .fromJust ) <$> genExpression expr
             instr <- popInstructions
             return . Right . toList $ A.BasicBlock retLabel instr $ I.Do $ I.Ret (Just op) []
-genStatement Break = do
+genStatement (Break _) = do
     l <- lastLoopEnd
     breakLabel <- nextLabel "Break"
     return . Right . toList $ emptyBlock breakLabel $ I.Br l []
-genStatement Continue = do
+genStatement (Continue _) = do
     l <- lastLoopNext
     continueLabel <- nextLabel "Continue"
     return . Right . toList $ emptyBlock continueLabel $ I.Br l []
@@ -396,7 +396,7 @@ genMethod mth@(Method mt _ mp b) = do
     instr <- popInstructions
     mthInitLabel <- nextLabel "MethodInit"
     fieldsInit <- if mt == Constructor then genFieldsInit else return . Right $ []
-    let b' = b ++ [Statement . Return . Just . QN $ This | mt == Constructor]
+    let b' = b ++ [Statement $ Return (Just $ Expr (QN $ QName This 0) 0) 0 | mt == Constructor]
     blockESt <- genBlock b'
     mthRet <- nextLabel "MethodExit"
     let initESt = Left $ genBrBlock mthInitLabel instr
@@ -408,7 +408,7 @@ genMethod mth@(Method mt _ mp b) = do
 genField :: Variable -> Codegen ()
 genField (Variable vt vn ve) = do
     let expr = fromMaybe (nullValue vt) ve 
-    void $ genExpression $ Assign (FieldAccess This vn) expr
+    void $ genExpression $ Expr (Assign (QName (FieldAccess (QName This 0) vn) 0) expr) 0
 
 genFieldsInit :: Codegen EStatement
 genFieldsInit = do

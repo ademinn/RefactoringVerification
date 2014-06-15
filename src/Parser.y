@@ -9,7 +9,7 @@ import Data.Either
 }
 
 %name parse
-%tokentype { TokenType }
+%tokentype { Token }
 %error { parseError }
 %lexer { lexWrap } { TEOF }
 %monad { Alex }
@@ -164,9 +164,9 @@ Statement
     | IfStatement   { IfStatement $1 }
     | WhileStatement    { WhileStatement $1 }
     | ForStatement      { ForStatement $1 }
-    | ReturnStatement   { Return $1 }
-    | break ";"            { Break }
-    | continue ";"          { Continue }
+    | ReturnStatement   {% withLine (Return $1) }
+    | break ";"            {% withLine Break }
+    | continue ";"          {% withLine Continue }
     | Expression ";"        { ExpressionStatement $1 }
 
 IfStatement :: { If }
@@ -210,6 +210,11 @@ ReturnStatement
 
 Expression :: { Expression }
 Expression
+    : ExpressionS {% withLine (Expr $1) }
+    | ParExperssion { $1 }
+
+ExpressionS :: { ExpressionS }
+ExpressionS
     : QualifiedName "=" Expression { Assign $1 $3 }
     | Expression "||" Expression { Or $1 $3 }
     | Expression "&&" Expression { And $1 $3 }
@@ -232,7 +237,6 @@ Expression
     | QualifiedName "++" %prec POSTFIX { PostInc $1 }
     | QualifiedName "--" %prec POSTFIX { PostDec $1 }
     | QualifiedName { QN $1 }
-    | ParExperssion { $1 }
     | literal { Literal $1 }
     | null { Null }
 
@@ -248,9 +252,13 @@ ExpressionRevList
 
 QualifiedName :: { QualifiedName }
 QualifiedName
+    : QualifiedNameS {% withLine (QName $1) }
+
+QualifiedNameS :: { QualifiedNameS }
+QualifiedNameS
     : QualifiedName "." identifier  { FieldAccess $1 $3 }
     | QualifiedName "." identifier "(" ExpressionList ")"  { MethodCall $1 $3 $5 }
-    | identifier "(" ExpressionList ")" { MethodCall This $1 $3 }
+    | identifier "(" ExpressionList ")" {% withLine (\l -> MethodCall (QName This l) $1 $3) }
     | identifier { Var $1 }
     | new ObjectType  "(" ExpressionList ")"  { New $2 $4 }
     | this { This }
@@ -275,8 +283,13 @@ PrimaryType
     | double { TDouble }
 
 {
-parseError :: TokenType -> Alex a
-parseError t = error $ "unexpected token " ++ (show t)
+parseError :: Token -> Alex a
+parseError t = do
+    (line, column) <- getPosition
+    alexError $ "unexpected token " ++ show t ++ " at line " ++ show line ++ ", column " ++ show (column - 1)
+
+withLine :: (Int -> a) -> Alex a
+withLine f = f <$> getLineNumber
 
 type Member = Either Variable Method
 

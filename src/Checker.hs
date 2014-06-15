@@ -88,7 +88,7 @@ checkMethod :: ObjectType -> String -> [Type] -> (Method -> Bool) -> CheckerErro
 checkMethod typeName mth prms f = methodType <$> (findMethod typeName mth prms f >>= checkEither)
 
 checkQualifiedName :: QualifiedName -> CheckerError MethodType
-checkQualifiedName (FieldAccess qn field) = do
+checkQualifiedName (QName (FieldAccess qn field) line) = do
     t <- checkQualifiedName qn
     case t of
         ReturnType (ObjectType ot) -> checkField ot field
@@ -99,7 +99,7 @@ checkQualifiedName (FieldAccess qn field) = do
             (t, _) <- findField typeName fieldName >>= checkEither
             return $ ReturnType t
 
-checkQualifiedName (MethodCall qn mth params) = do
+checkQualifiedName (QName (MethodCall qn mth params) line) = do
     t <- checkQualifiedName qn
     paramTypes <- mapM checkReturnExpression params
     case t of
@@ -107,17 +107,17 @@ checkQualifiedName (MethodCall qn mth params) = do
         Constructor -> error "error in checkr"
         t' -> stopAnalyzer $ show t' ++ " has no methods"
                             
-checkQualifiedName (Var var) = do
+checkQualifiedName (QName (Var var) line) = do
     vs <- lookupLocalVar var
     case vs of
         Just v -> return . ReturnType . vsType $ v
-        Nothing -> checkQualifiedName $ FieldAccess This var
+        Nothing -> checkQualifiedName $ QName (FieldAccess (QName This line) var) line
 
-checkQualifiedName (New typeName params) = do
+checkQualifiedName (QName (New typeName params) line) = do
     paramTypes <- mapM checkReturnExpression params
     void $ checkMethod typeName typeName paramTypes (\m -> methodType m == Constructor)
     return . ReturnType . ObjectType $ typeName
-checkQualifiedName This = ReturnType <$> ObjectType <$> classNameM
+checkQualifiedName (QName This line) = ReturnType <$> ObjectType <$> classNameM
 
 checkReturnQualifiedName :: QualifiedName -> CheckerError Type
 checkReturnQualifiedName qn = do
@@ -127,8 +127,8 @@ checkReturnQualifiedName qn = do
         _ -> stopAnalyzer "Qualified name has no value"
 
 getValueType :: QualifiedName -> ValueType
-getValueType (FieldAccess _ _) = LValue
-getValueType (Var _) = LValue
+getValueType (QName (FieldAccess _ _) line) = LValue
+getValueType (QName (Var _) line) = LValue
 getValueType _ = RValue
 
 inferType :: Type -> Type -> CheckerError Type
@@ -188,39 +188,39 @@ retBoolean :: CheckerError MethodType
 retBoolean = return . ReturnType . PrimaryType $ TBoolean
 
 checkExpression :: Expression -> CheckerError MethodType
-checkExpression (Assign qn expr) = do
+checkExpression (Expr (Assign qn expr) line) = do
     checkLValue qn
     q <- checkReturnQualifiedName qn
     e <- checkReturnExpression expr
     castType e q
     return . ReturnType $ q
-checkExpression (Or e1 e2) = checkBoolOp e1 e2
-checkExpression (And e1 e2) = checkBoolOp e1 e2
-checkExpression (Equal e1 e2) = checkEqOp e1 e2 >> retBoolean
-checkExpression (Ne e1 e2) = checkEqOp e1 e2 >> retBoolean
-checkExpression (Lt e1 e2) = checkNumericOp e1 e2 >> retBoolean
-checkExpression (Gt e1 e2) = checkNumericOp e1 e2 >> retBoolean
-checkExpression (Le e1 e2) = checkNumericOp e1 e2 >> retBoolean
-checkExpression (Ge e1 e2) = checkNumericOp e1 e2 >> retBoolean
-checkExpression (Plus e1 e2) = checkNumericOp e1 e2
-checkExpression (Minus e1 e2) = checkNumericOp e1 e2
-checkExpression (Mul e1 e2) = checkNumericOp e1 e2
-checkExpression (Div e1 e2) = checkNumericOp e1 e2
-checkExpression (Mod e1 e2) = checkNumericOp e1 e2
-checkExpression (Pos e) = checkUnaryOp e
-checkExpression (Neg e) = checkUnaryOp e
-checkExpression (Not e) = do
+checkExpression (Expr (Or e1 e2) line) = checkBoolOp e1 e2
+checkExpression (Expr (And e1 e2) line) = checkBoolOp e1 e2
+checkExpression (Expr (Equal e1 e2) line) = checkEqOp e1 e2 >> retBoolean
+checkExpression (Expr (Ne e1 e2) line) = checkEqOp e1 e2 >> retBoolean
+checkExpression (Expr (Lt e1 e2) line) = checkNumericOp e1 e2 >> retBoolean
+checkExpression (Expr (Gt e1 e2) line) = checkNumericOp e1 e2 >> retBoolean
+checkExpression (Expr (Le e1 e2) line) = checkNumericOp e1 e2 >> retBoolean
+checkExpression (Expr (Ge e1 e2) line) = checkNumericOp e1 e2 >> retBoolean
+checkExpression (Expr (Plus e1 e2) line) = checkNumericOp e1 e2
+checkExpression (Expr (Minus e1 e2) line) = checkNumericOp e1 e2
+checkExpression (Expr (Mul e1 e2) line) = checkNumericOp e1 e2
+checkExpression (Expr (Div e1 e2) line) = checkNumericOp e1 e2
+checkExpression (Expr (Mod e1 e2) line) = checkNumericOp e1 e2
+checkExpression (Expr (Pos e) line) = checkUnaryOp e
+checkExpression (Expr (Neg e) line) = checkUnaryOp e
+checkExpression (Expr (Not e) line) = do
     et <- checkReturnExpression e
     case et of
         PrimaryType TBoolean -> return . ReturnType $ et
         _ -> stopAnalyzer $ "Wrong experssion type: " ++ show et
-checkExpression (PreInc e) = checkIncDecOp e
-checkExpression (PreDec e) = checkIncDecOp e
-checkExpression (PostInc e) = checkIncDecOp e
-checkExpression (PostDec e) = checkIncDecOp e
-checkExpression (QN qn) = checkQualifiedName qn
-checkExpression (Literal l) = return . ReturnType . PrimaryType $ literalType l
-checkExpression Null = return . ReturnType $ NullType
+checkExpression (Expr (PreInc e) line) = checkIncDecOp e
+checkExpression (Expr (PreDec e) line) = checkIncDecOp e
+checkExpression (Expr (PostInc e) line) = checkIncDecOp e
+checkExpression (Expr (PostDec e) line) = checkIncDecOp e
+checkExpression (Expr (QN qn) line) = checkQualifiedName qn
+checkExpression (Expr (Literal l) line) = return . ReturnType . PrimaryType $ literalType l
+checkExpression (Expr Null line) = return . ReturnType $ NullType
 
 checkReturnExpression :: Expression -> CheckerError Type
 checkReturnExpression expr = do
@@ -308,13 +308,13 @@ instance Checkable Statement where
     check (IfStatement st) = check st
     check (WhileStatement st) = check st
     check (ForStatement st) = check st
-    check (Return expr) = do
+    check (Return expr line) = do
         ret <- methodTypeM
         case expr of
             Nothing -> CM.unless (ret == Void) $ newError "Missing return value"
             Just e -> ifOkExpr e $ \mt -> CM.unless (ret == mt) $ newError $ "Incompatible types: required " ++ show ret ++ ", found " ++ show mt
-    check Break = return ()
-    check Continue = return ()
+    check (Break line) = return ()
+    check (Continue line) = return ()
     check (ExpressionStatement expr) = void $ checkExpr expr
 
 instance Checkable BlockStatement where
