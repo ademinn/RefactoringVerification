@@ -45,7 +45,7 @@ main :: IO ()
 main = do
     args <- Env.getArgs
     withArgs args $ \s -> do
-        let p = map addEmptyConstructor $ parse . alexScanTokens $ s
+        let p = map addEmptyConstructor $ fromRight "" $ runAlex s parse
         case runIdentity . execWriterT . runStateT (check p) $ defaultAnalyzerState of
             [] -> do
                 let astModule = evalState (genProgram p) defaultCodegenState

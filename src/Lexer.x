@@ -5,7 +5,7 @@ import Data.Strict.Tuple
 import Type
 }
 
-%wrapper "posn"
+%wrapper "monad"
 
 $digit      = [0-9]
 $alpha      = [a-zA-Z_]
@@ -32,23 +32,23 @@ tokens :-
     $alpha $alphanum*           { makeToken (\s -> TIdentifier s) }
 
 {
-data Token
-    = Token
-    { tokenType :: TokenType
-    , position :: Pair Int Int
-    }
-    deriving (Eq, Show)
+alexEOF :: Alex TokenType
+alexEOF = return TEOF
 
-getPos :: AlexPosn -> Pair Int Int
-getPos (AlexPn _ line column) = line :!: column
+makeToken :: (String -> TokenType) -> AlexAction TokenType
+makeToken f = token f'
+    where f' (_, _, _, s) len = f . take len $ s
 
-makeToken :: (String -> TokenType) -> AlexPosn -> String -> Token
-makeToken f p s = Token (f s) (getPos p)
+lexWrap :: (TokenType -> Alex a) -> Alex a
+lexWrap cont = do
+    tok <- alexMonadScan
+    cont tok
 
 data TokenType
     = TKeyword String
     | TIdentifier String
     | TOperator String
     | TLiteral Literal
+    | TEOF
     deriving (Eq, Show)
 }

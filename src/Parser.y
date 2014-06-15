@@ -9,58 +9,60 @@ import Data.Either
 }
 
 %name parse
-%tokentype { Token }
+%tokentype { TokenType }
 %error { parseError }
+%lexer { lexWrap } { TEOF }
+%monad { Alex }
 
 %token
-    class       { Token (TKeyword "class") _    }
-    void        { Token (TKeyword "void") _     }
-    if          { Token (TKeyword "if") _       }
-    else        { Token (TKeyword "else") _     }
-    while       { Token (TKeyword "while") _    }
-    for         { Token (TKeyword "for") _      }
-    break       { Token (TKeyword "break") _    }
-    continue    { Token (TKeyword "continue") _ }
-    return      { Token (TKeyword "return") _   }
-    null        { Token (TKeyword "null") _     }
-    this        { Token (TKeyword "this") _     }
-    new         { Token (TKeyword "new") _      }
-    boolean     { Token (TKeyword "boolean") _  }
-    byte        { Token (TKeyword "byte") _     }
-    short       { Token (TKeyword "short") _    }
-    int         { Token (TKeyword "int") _      }
-    long        { Token (TKeyword "long") _     }
-    float       { Token (TKeyword "float") _    }
-    double      { Token (TKeyword "double") _   }
+    class       { TKeyword "class"    }
+    void        { TKeyword "void"     }
+    if          { TKeyword "if"       }
+    else        { TKeyword "else"     }
+    while       { TKeyword "while"    }
+    for         { TKeyword "for"      }
+    break       { TKeyword "break"    }
+    continue    { TKeyword "continue" }
+    return      { TKeyword "return"   }
+    null        { TKeyword "null"     }
+    this        { TKeyword "this"     }
+    new         { TKeyword "new"      }
+    boolean     { TKeyword "boolean"  }
+    byte        { TKeyword "byte"     }
+    short       { TKeyword "short"    }
+    int         { TKeyword "int"      }
+    long        { TKeyword "long"     }
+    float       { TKeyword "float"    }
+    double      { TKeyword "double"   }
 
-    "||"        { Token (TOperator "||") _ }
-    "&&"        { Token (TOperator "&&") _ }
-    "=="        { Token (TOperator "==") _ }
-    "!="        { Token (TOperator "!=") _ }
-    "<"         { Token (TOperator "<") _ }
-    ">"         { Token (TOperator ">") _ }
-    "<="        { Token (TOperator "<=") _ }
-    ">="        { Token (TOperator ">=") _ }
-    "+"         { Token (TOperator "+") _ }
-    "-"         { Token (TOperator "-") _ }
-    "*"         { Token (TOperator "*") _ }
-    "/"         { Token (TOperator "/") _ }
-    "%"         { Token (TOperator "%") _ }
-    "!"         { Token (TOperator "!") _ }
-    "--"        { Token (TOperator "--") _ }
-    "++"        { Token (TOperator "++") _ }
-    "("         { Token (TOperator "(") _ }
-    ")"         { Token (TOperator ")") _ }
-    "{"         { Token (TOperator "{") _ }
-    "}"         { Token (TOperator "}") _ }
-    ","         { Token (TOperator ",") _ }
-    ";"         { Token (TOperator ";") _ }
-    "."         { Token (TOperator ".") _ }
-    "="         { Token (TOperator "=") _ }
+    "||"        { TOperator "||" }
+    "&&"        { TOperator "&&" }
+    "=="        { TOperator "==" }
+    "!="        { TOperator "!=" }
+    "<"         { TOperator "<" }
+    ">"         { TOperator ">" }
+    "<="        { TOperator "<=" }
+    ">="        { TOperator ">=" }
+    "+"         { TOperator "+" }
+    "-"         { TOperator "-" }
+    "*"         { TOperator "*" }
+    "/"         { TOperator "/" }
+    "%"         { TOperator "%" }
+    "!"         { TOperator "!" }
+    "--"        { TOperator "--" }
+    "++"        { TOperator "++" }
+    "("         { TOperator "(" }
+    ")"         { TOperator ")"  }
+    "{"         { TOperator "{" }
+    "}"         { TOperator "}" }
+    ","         { TOperator "," }
+    ";"         { TOperator ";" }
+    "."         { TOperator "." }
+    "="         { TOperator "=" }
 
-    literal     { Token (TLiteral $$) _ }
+    literal     { TLiteral $$ }
 
-    identifier  { Token (TIdentifier $$) _ }
+    identifier  { TIdentifier $$ }
 
 %right "="
 %left "||"
@@ -273,9 +275,8 @@ PrimaryType
     | double { TDouble }
 
 {
-parseError :: [Token] -> a
-parseError ((Token t (line :!: column)) : _) = error $ "unexpected token " ++ (show t) ++ " at position " ++ (show line) ++ ":" ++ (show column)
-parseError [] = error "unexpected end of file"
+parseError :: TokenType -> Alex a
+parseError t = error $ "unexpected token " ++ (show t)
 
 type Member = Either Variable Method
 
