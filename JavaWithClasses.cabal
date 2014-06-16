@@ -30,7 +30,7 @@ executable hjava
 
 test-suite main-suite
   type:             exitcode-stdio-1.0
-  hs-source-dirs:   test
+  hs-source-dirs:   test/src
   main-is:          Test.hs
   build-depends:    test-framework, test-framework-hunit, base >=4.5, HUnit >=1.2.5.2, Cabal >=1.14.0, JavaWithClasses
   other-modules:    TestLexer

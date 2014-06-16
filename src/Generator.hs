@@ -25,6 +25,7 @@ type EStatement = Either (A.Name -> [A.BasicBlock]) [A.BasicBlock]
 castPrimatyTypeOperand :: (PrimaryType, A.Operand) -> PrimaryType -> Codegen A.Operand
 castPrimatyTypeOperand (ot, op) t = if ot == t then return op else addInstr $ f ot t op (mapPrimaryType t) []
     where
+        f _ TShort = I.SExt
         f _ TInt = I.SExt
         f _ TLong = I.SExt
         f _ TFloat = I.SIToFP

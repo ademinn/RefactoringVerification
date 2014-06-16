@@ -5,7 +5,12 @@ import Data.Int
 import qualified Data.List as List
 
 data Type = ObjectType ObjectType | PrimaryType PrimaryType | NullType
-    deriving (Eq, Show)
+    deriving Eq
+
+instance Show Type where
+    show (ObjectType ot) = ot
+    show (PrimaryType pt) = show pt
+    show NullType = "null"
 
 type ObjectType = String
 
@@ -17,25 +22,48 @@ data PrimaryType
     | TLong
     | TFloat
     | TDouble
-    deriving (Eq, Show, Ord)
+    deriving (Eq, Ord)
+
+instance Show PrimaryType where
+    show TBoolean = "boolean"
+    show TByte = "byte"
+    show TShort = "short"
+    show TInt = "int"
+    show TLong = "long"
+    show TFloat = "float"
+    show TDouble = "double"
 
 data Literal
-    = LInt Int32
+    = LBoolean Bool
+    | LByte Int8
+    | LShort Int16
+    | LInt Int32
     | LLong Int64
     | LFloat Float
     | LDouble Double
-    | LBoolean Bool
-    deriving (Eq, Show)
+    deriving Eq
+
+instance Show Literal where
+    show (LBoolean b) = show b
+    show (LByte b) = show b
+    show (LShort s) = show s
+    show (LInt i) = show i
+    show (LLong l) = show l
+    show (LFloat f) = show f
+    show (LDouble d) = show d
+    
 
 data Ternary = Zero | Half | One
     deriving (Show, Eq, Ord)
 
 literalType :: Literal -> PrimaryType
+literalType (LBoolean _) = TBoolean
+literalType (LByte _) = TByte
+literalType (LShort _) = TShort
 literalType (LInt _) = TInt
 literalType (LLong _) = TLong
 literalType (LFloat _) = TFloat
 literalType (LDouble _) = TDouble
-literalType (LBoolean _) = TBoolean
 
 inferPrimary :: PrimaryType -> PrimaryType -> Maybe PrimaryType
 inferPrimary TBoolean TBoolean = Just TBoolean

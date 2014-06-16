@@ -99,6 +99,8 @@ literalToOp l = A.ConstantOperand $ f l
     where
         f (LBoolean False) = C.Int 1 0
         f (LBoolean True) = C.Int 1 1
+        f (LByte i) = C.Int 8 $ toInteger i
+        f (LShort i) = C.Int 16 $ toInteger i
         f (LInt i) = C.Int 32 $ toInteger i
         f (LLong i) = C.Int 64 $ toInteger i
         f (LFloat i) = C.Float $ F.Single i
@@ -106,11 +108,12 @@ literalToOp l = A.ConstantOperand $ f l
 
 nullPrimaryValue :: PrimaryType -> Literal
 nullPrimaryValue TBoolean = LBoolean False 
+nullPrimaryValue TByte = LByte 0
+nullPrimaryValue TShort = LShort 0
 nullPrimaryValue TInt = LInt 0
 nullPrimaryValue TLong = LLong 0
 nullPrimaryValue TFloat = LFloat 0.0
 nullPrimaryValue TDouble = LDouble 0.0
-nullPrimaryValue _ = error "null primary value"
 
 nullValue :: Type -> Expression
 nullValue (ObjectType _) = Expr Null 0
@@ -167,6 +170,8 @@ nullConstant t = A.ConstantOperand $ C.Null $ mapType $ ObjectType t
 oneOp :: Type -> A.Operand
 oneOp (PrimaryType t) = f t
     where
+        f TByte = literalToOp $ LByte 1
+        f TShort = literalToOp $ LShort 1
         f TInt = literalToOp $ LInt 1
         f TLong = literalToOp $ LLong 1
         f _ = error "typed one"

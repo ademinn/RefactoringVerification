@@ -1,6 +1,11 @@
 module AST where
 
+import Data.List
+
 import Type
+
+class WithLine a where
+    lineNumber :: a -> Int
 
 type Program = [Class]
 
@@ -18,7 +23,13 @@ data Variable
     , varName :: String
     , initExpr :: Maybe Expression
     }
-    deriving (Eq, Show)
+    deriving Eq
+
+instance Show Variable where
+    show (Variable t n e) = show t ++ " " ++ n ++ showMaybe e ++ ";"
+        where
+            showMaybe Nothing = ""
+            showMaybe (Just e) = " = " ++ show e
 
 data Method
     = Method
@@ -27,17 +38,31 @@ data Method
     , methodParams :: [Parameter]
     , methodBlock :: Block
     }
-    deriving (Eq, Show)
+    deriving Eq
+
+instance Show Method where
+    show (Method _ n p _) = n ++ "(" ++ showL p ++ ")"
+
+showMethod :: Class -> Method -> String
+showMethod (Class n _ _) mth = n ++ "." ++ show mth
 
 data MethodType = ReturnType Type | Void | Constructor
-    deriving (Eq, Show)
+    deriving Eq
+
+instance Show MethodType where
+    show (ReturnType rt) = show rt
+    show Void = "void"
+    show Constructor = "#Constructor"
 
 data Parameter
     = Parameter
     { paramType :: Type
     , paramName :: String
     }
-    deriving (Eq, Show)
+    deriving Eq
+
+instance Show Parameter where
+    show (Parameter t n) = show t ++ " " ++ n
 
 type Block = [BlockStatement]
 
@@ -53,7 +78,20 @@ data Statement
     | Break Int
     | Continue Int
     | ExpressionStatement Expression
-    deriving (Eq, Show)
+    deriving Eq
+
+instance Show Statement where
+    show (SubBlock b) = show b
+    show (IfStatement i) = show i
+    show (WhileStatement w) = show w
+    show (ForStatement f) = show f
+    show (Return e _) = "return" ++ showMaybe e ++ ";"
+        where
+            showMaybe Nothing = ""
+            showMaybe (Just e) = " " ++ show e
+    show (Break _) = "break;"
+    show (Continue _) = "continue;"
+    show (ExpressionStatement e) = show e ++ ";"
 
 data If
     = If 
@@ -83,7 +121,10 @@ data ForInit = ForInitVD Variable | ForInitEL [Expression]
     deriving (Eq, Show)
 
 data Expression = Expr ExpressionS Int
-    deriving (Eq, Show)
+    deriving Eq
+
+instance Show Expression where
+    show (Expr e _) = show e
 
 data ExpressionS
     = Assign QualifiedName Expression
@@ -110,10 +151,45 @@ data ExpressionS
     | QN QualifiedName
     | Literal Literal
     | Null
-    deriving (Eq, Show)
+    deriving Eq
+
+instance Show ExpressionS where
+    show e = "(" ++ showUnbracket e ++ ")"
+
+showUnbracket :: ExpressionS -> String
+showUnbracket (Assign qn e) = show qn ++ " = " ++ show e
+showUnbracket (Or e1 e2) = show e1 ++ " or " ++ show e2
+showUnbracket (And e1 e2) = show e1 ++ " and " ++ show e2
+showUnbracket (Equal e1 e2) = show e1 ++ " == " ++ show e2
+showUnbracket (Ne e1 e2) = show e1 ++ " != " ++ show e2
+showUnbracket (Lt e1 e2) = show e1 ++ " < " ++ show e2
+showUnbracket (Gt e1 e2) = show e1 ++ " > " ++ show e2
+showUnbracket (Le e1 e2) = show e1 ++ " <= " ++ show e2
+showUnbracket (Ge e1 e2) = show e1 ++ " >= " ++ show e2
+showUnbracket (Plus e1 e2) = show e1 ++ " + " ++ show e2
+showUnbracket (Minus e1 e2) = show e1 ++ " - " ++ show e2
+showUnbracket (Mul e1 e2) = show e1 ++ " * " ++ show e2
+showUnbracket (Div e1 e2) = show e1 ++ " / " ++ show e2
+showUnbracket (Mod e1 e2) = show e1 ++ " % " ++ show e2
+showUnbracket (Pos e) = "+" ++ show e
+showUnbracket (Neg e) = "-" ++ show e
+showUnbracket (Not e) = "!" ++ show e
+showUnbracket (PreInc qn) = "++" ++ show qn
+showUnbracket (PreDec qn) = "--" ++ show qn
+showUnbracket (PostInc qn) = show qn ++ "++"
+showUnbracket (PostDec qn) = show qn ++ "--"
+showUnbracket (QN qn) = show qn
+showUnbracket (Literal l) = show l
+showUnbracket Null = "null"
+
+instance WithLine Expression where
+    lineNumber (Expr _ l) = l
 
 data QualifiedName = QName QualifiedNameS Int
-    deriving (Eq, Show)
+    deriving Eq
+
+instance Show QualifiedName where
+    show (QName qn _) = show qn
 
 data QualifiedNameS
     = FieldAccess QualifiedName String
@@ -121,4 +197,17 @@ data QualifiedNameS
     | Var String
     | New ObjectType [Expression]
     | This
-    deriving (Eq, Show)
+    deriving Eq
+
+instance WithLine QualifiedName where
+    lineNumber (QName _ l) = l
+
+instance Show QualifiedNameS where
+    show (FieldAccess qn s) = show qn ++ "." ++ s
+    show (MethodCall qn s ex) = show qn ++ "." ++ s ++ "(" ++ showL ex ++ ")"
+    show (Var s) = s
+    show (New ot ex) = "new " ++ ot ++ "(" ++ showL ex ++ ")"
+    show This = "this"
+
+showL :: (Show a) => [a] -> String
+showL ex = intercalate ", " $ map show ex
