@@ -63,8 +63,8 @@ findMethod typeName mth prms f = do
                 Right . head $ ones
             else
                 case compare (length halfs) 1 of
-                    GT -> Left $ "Ambiguous method call " ++ mth
-                    LT -> Left "None method match"
+                    GT -> Left $ "Ambiguous method call:\n" ++ (unlines $ map (\m -> "    " ++ showMethod cls' m) halfs)
+                    LT -> Left $ "Cannot resolve method " ++ typeName ++ "." ++ mth ++ "(" ++ showL prms ++ ")"
                     EQ -> Right . head $ halfs
 
 findField :: (WithProgram s, MonadState s m) => ObjectType -> String -> m (Either String (Type, Int))

@@ -81,17 +81,17 @@ stopAnalyzer = throwError
 stopAnalyzerLine :: (WithLine t, Show t) => t -> SemanticError -> CheckerError a
 stopAnalyzerLine t e = stopAnalyzer $ "on line " ++ show (lineNumber t) ++ ", in \"" ++ show t ++ "\": " ++ e
 
-checkEither :: Either SemanticError a -> CheckerError a
-checkEither (Left err) = stopAnalyzer err
-checkEither (Right res) = return res
+checkEither :: (Show t, WithLine t) => t -> Either SemanticError a -> CheckerError a
+checkEither t (Left err) = stopAnalyzerLine t err
+checkEither _ (Right res) = return res
 
 addLocalVar :: Type -> String -> Bool -> Checker ()
 addLocalVar t n i = do
     res <- newLocalVar n $ VarSymbol n t i
     Foldable.forM_ res newError
 
-checkMethod :: ObjectType -> String -> [Type] -> (Method -> Bool) -> CheckerError MethodType
-checkMethod typeName mth prms f = methodType <$> (findMethod typeName mth prms f >>= checkEither)
+checkMethod :: QualifiedName -> ObjectType -> String -> [Type] -> (Method -> Bool) -> CheckerError MethodType
+checkMethod qn typeName mth prms f = methodType <$> (findMethod typeName mth prms f >>= (checkEither qn))
 
 checkQualifiedName :: QualifiedName -> CheckerError MethodType
 checkQualifiedName q@(QName (FieldAccess qn field) line) = do
@@ -102,14 +102,14 @@ checkQualifiedName q@(QName (FieldAccess qn field) line) = do
         t' -> stopAnalyzerLine q $ show t' ++ " has no fields"
     where
         checkField typeName fieldName = do
-            (t, _) <- findField typeName fieldName >>= checkEither
+            (t, _) <- findField typeName fieldName >>= checkEither q
             return $ ReturnType t
 
 checkQualifiedName q@(QName (MethodCall qn mth params) line) = do
     t <- checkQualifiedName qn
     paramTypes <- mapM checkReturnExpression params
     case t of
-        ReturnType (ObjectType ot) -> checkMethod ot mth paramTypes (\m -> methodType m /= Constructor)
+        ReturnType (ObjectType ot) -> checkMethod q ot mth paramTypes (\m -> methodType m /= Constructor)
         Constructor -> error "error in checkr"
         t' -> stopAnalyzerLine q $ show t' ++ " has no methods"
                             
@@ -119,9 +119,9 @@ checkQualifiedName (QName (Var var) line) = do
         Just v -> return . ReturnType . vsType $ v
         Nothing -> checkQualifiedName $ QName (FieldAccess (QName This line) var) line
 
-checkQualifiedName (QName (New typeName params) line) = do
+checkQualifiedName q@(QName (New typeName params) line) = do
     paramTypes <- mapM checkReturnExpression params
-    void $ checkMethod typeName typeName paramTypes (\m -> methodType m == Constructor)
+    void $ checkMethod q typeName typeName paramTypes (\m -> methodType m == Constructor)
     return . ReturnType . ObjectType $ typeName
 checkQualifiedName (QName This line) = ReturnType <$> ObjectType <$> classNameM
 
