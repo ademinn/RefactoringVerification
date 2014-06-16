@@ -261,6 +261,20 @@ checkReturnSt (IfStatement (If _ _ Nothing)) = return False
 checkReturnSt (IfStatement (If _ st1 (Just st2))) = (&&) <$> checkReturnSt st1 <*> checkReturnSt st2
 checkReturnSt _ = return False
 
+findRedefs :: [Method] -> [Method]
+findRedefs mths = fst $ foldl f ([], []) mths
+    where
+        f l@(redef, al) m =
+            let cms = compareMethodSignatures m in
+            if any cms al
+                then
+                    if any cms redef then l else (m:redef, al)
+                else
+                    (redef, m:al)
+
+compareMethodSignatures :: Method -> Method -> Bool
+compareMethodSignatures (Method _ n1 p1 _) (Method _ n2 p2 _) = n1 == n2 && (map paramType p1) == (map paramType p2)
+
 instance Checkable Type where
     check t = do
         defined <- isTypeDefined t
@@ -361,6 +375,8 @@ instance Checkable Class where
     check cls = do
         modify $ \s -> s { currentMaybeClass = Just cls }
         CM.mapM_ check $ classFields cls
+        let redefs = findRedefs $ classMethods cls
+        CM.forM_ redefs $ newError . (\m -> "method redefinition: " ++ showMethod cls m)
         CM.mapM_ check $ classMethods cls
         modify $ \s -> s { currentMaybeClass = Nothing }
 
