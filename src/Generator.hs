@@ -77,7 +77,7 @@ genCmpOp
     :: Expression -> Expression
     -> IP.IntegerPredicate -> FPP.FloatingPointPredicate
     -> Codegen (Maybe (Type, A.Operand))
-genCmpOp e1 e2 ip fpp = genTypedBinaryOpM e1 e2 f
+genCmpOp e1 e2 ip fpp = toBool <$> genTypedBinaryOpM e1 e2 f
     where
         f (PrimaryType TFloat) o1 o2 = return $ I.FCmp fpp o1 o2 []
         f (PrimaryType TDouble) o1 o2 = return $ I.FCmp fpp o1 o2 []
@@ -86,6 +86,8 @@ genCmpOp e1 e2 ip fpp = genTypedBinaryOpM e1 e2 f
             o1i <- addInstr $ I.PtrToInt o1 (T.IntegerType structPtrSize) []
             o2i <- addInstr $ I.PtrToInt o2 (T.IntegerType structPtrSize) []
             return $ I.ICmp ip o1i o2i []
+
+        toBool m = (\(_, o) -> (PrimaryType TBoolean, o)) <$> m
 
 genArithmOp
     :: Expression -> Expression
