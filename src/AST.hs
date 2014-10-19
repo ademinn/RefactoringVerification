@@ -4,16 +4,14 @@ import Data.List
 
 import Type
 
-class WithLine a where
-    lineNumber :: a -> Int
-
 type Program = [Class]
 
 data Class
     = Class
-    { className :: String
-    , classFields :: [Variable]
-    , classMethods :: [Method]
+    { clsName :: String
+    , clsFields :: [Variable]
+    , clsConstructor :: Constructor
+    , clsMethods :: [Method]
     }
     deriving (Eq, Show)
 
@@ -21,7 +19,6 @@ data Variable
     = Variable
     { varType :: Type
     , varName :: String
-    , initExpr :: Maybe Expression
     }
     deriving Eq
 
@@ -30,6 +27,13 @@ instance Show Variable where
         where
             showMaybe Nothing = ""
             showMaybe (Just e) = " = " ++ show e
+
+data Constructor
+    = Constructor
+    { consName :: String
+    , consParams :: [Parameter]
+    }
+    deriving Eq
 
 data Method
     = Method

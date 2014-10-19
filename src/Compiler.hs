@@ -5,8 +5,6 @@ import qualified System.Environment as Env
 import qualified Lexer as L
 
 import Parser
-import Checker
-import Analyzer
 import Control.Applicative
 import Control.Monad.State
 import Control.Monad.Writer
@@ -26,4 +24,6 @@ splitLast :: Int -> String -> (String, String)
 splitLast i s = splitAt (length s - i) s
 
 main :: IO ()
-main = return ()
+main = do
+    s <- getLine
+    print $ L.runAlex s parse
