@@ -82,20 +82,20 @@ ConstructorDefinition
 
 ConsBlock :: { ConsBlock }
 ConsBlock
-    : "{" AssignList "}"    { ConsBlock }
+    : "{" AssignList "}"    { $2 }
 
-AssignList :: { () }
+AssignList :: { [Assign] }
 AssignList
     : AssignListRev { $1 }
 
-AssignListRev :: { () }
+AssignListRev :: { [Assign] }
 AssignListRev
-    : AssignListRev Assign { () }
-    | {- empty -}   { () }
+    : AssignListRev Assign { $2 : $1 }
+    | {- empty -}   { [] }
 
-Assign :: { () }
+Assign :: { Assign }
 Assign
-    : this "." identifier "=" identifier ";"    { () }
+    : this "." identifier "=" identifier ";"    { Assign $3 $5 }
 
 Parameters :: { [Variable] }
 Parameters
@@ -121,7 +121,7 @@ Expression
     | Expression "." identifier  { FieldAccess $1 $3 }
     | Expression "." identifier Expressions { MethodCall $1 $3 $4 }
     | identifier { Var $1 }
-    | this { This }
+    | this { Var "this" }
 
 Expressions :: { [Expression] }
 Expressions
@@ -152,8 +152,8 @@ withLine f = f <$> getLineNumber
 
 data Member = MV Variable | MC Constructor | MM Method
 
-partitionMembers :: [Member] -> ([Variable], Constructor, [Method])
-partitionMembers members = (mapMembers isVariable, head $ mapMembers isConstructor, mapMembers isMethod)
+partitionMembers :: [Member] -> ([Variable], [Constructor], [Method])
+partitionMembers members = (mapMembers isVariable, mapMembers isConstructor, mapMembers isMethod)
     where
         mapMembers f = mapMaybe f members
 
@@ -167,7 +167,7 @@ partitionMembers members = (mapMembers isVariable, head $ mapMembers isConstruct
         isMethod _ = Nothing
 
 buildClass :: String -> [Member] -> Class
-buildClass name members = Class name fields constructor methods
-    where (fields, constructor, methods) = partitionMembers members
+buildClass name members = Class name fields constructors methods
+    where (fields, constructors, methods) = partitionMembers members
 
 }

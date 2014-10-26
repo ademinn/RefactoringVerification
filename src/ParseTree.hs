@@ -10,7 +10,7 @@ data Class
     = Class
     { clsName :: String
     , clsFields :: [Variable]
-    , clsConstructor :: Constructor
+    , clsConstructors :: [Constructor]
     , clsMethods :: [Method]
     }
     deriving (Eq, Show)
@@ -39,9 +39,12 @@ data Method
     }
     deriving (Eq, Show)
 
-data ConsBlock
-    = ConsBlock
-    {
+type ConsBlock = [Assign]
+
+data Assign
+    = Assign
+    { field :: Identifier
+    , value :: Identifier
     }
     deriving (Eq, Show)
 
@@ -50,7 +53,6 @@ data Expression
     | FieldAccess Expression Identifier
     | MethodCall Expression Identifier [Expression]
     | Var Identifier
-    | This
     deriving (Eq, Show)
 
 type Identifier = String
