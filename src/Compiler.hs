@@ -4,6 +4,7 @@ import qualified System.Environment as Env
 
 import qualified Lexer as L
 
+import Checker
 import Parser
 import Control.Applicative
 import Control.Monad.State
