@@ -23,8 +23,13 @@ checkUnique eqFunc showErr ls = mapM checkElem ls
 checkVariablesUnique :: [Variable] -> Checker ()
 checkVariablesUnique = checkUnique (\(Variable _ n1) (Variable _ n2) -> n1 == n2) (\v -> "Variable " ++ show . varName $ v ++ " already exists")
 
-checkType :: PT.Program -> Type -> Checker ()
-checkType program t = check (isJust . find (\cls -> PT.clsName cls == t) program) "Class " ++ t ++ " not found"
+getClass :: PT.Program -> Type -> Maybe PT.Class
+getClass program t = find (\cls -> PT.clsName cls == t) program
+
+checkType :: PT.Program -> Type -> Checker PT.Class
+checkType program t = case getClass program t of
+    Just c -> return c
+    Nothing -> throwError "Class " ++ t ++ " not found"
 
 checkVariableType :: PT.Program -> Variable -> Checker ()
 checkVariableType program var = checkType program $ varType var
@@ -40,6 +45,19 @@ getvarType vars id = if null tVars
         return $ head tVars
     where
         tVars = mapMaybe (\(Variable t n) -> if n == id then Just t else Nothing) vars
+
+checkParameters :: [Variable] -> [Type] -> Checker ()
+checkParameters params types = check (map varType params) == types "incompatible types"
+
+getField :: PT.Class -> Identifier -> Checker Variable
+getField cls id = case find (\field -> PT.varName field == id) $ PT.clsFields cls of
+    Just f -> return f
+    Nothing -> throwError "Field " ++ id ++ " not found"
+
+getMethod :: PT.Class -> Identifier -> Checker Method
+getMethod cls id = case find (\mth -> PT.mthName mth == id) $ PT.clsMethods cls of
+    Just m -> return m
+    Nothing -> throwError "Field " ++ id ++ " not found"
 
 checkProgram :: PT.Program -> Checker Program
 checkProgram = undefined
@@ -69,9 +87,25 @@ checkMethod program cls (Method mthT _ mthPs mthE) = do
     checkType program mthT
     checkVariablesTypes program mthPs
     checkVariablesUnique mthPs
-    expr <- checkExpression mthE
-    return $ Method mthPs expr
+    checkExpression mthE
+    return $ Method mthPs mthE
 
-checkExpression :: PT.Program -> Expression -> Checker Expression
-checkExpression _ = return
-
+checkExpression :: PT.Program -> [Variable] -> Expression -> Checker PT.Class
+checkExpression program ctx (New t ps) = do
+    newCls <- checkType program t
+    exprTypes <- mapM (clsName <$> checkExpression program ctx) ps
+    checkParameters  (consParams . head . clsConstructors $ newCls) exprTypes
+    return newCls
+checkExpression program ctx (FieldAccess expr field) = do
+    exprCls <- checkExpression program ctx expr
+    f <- getField exprCls field
+    checkType program $ PT.varType f
+checkExpression program ctx (MethodCall subExpr mthN ps) = do
+    subCls <- checkExpression program ctx subExpr
+    exprTypes <- mapM (clsName <$> checkExpression program ctx) ps
+    mth <- getMethod subCls mthN
+    checkParameters (PT.mthParams mth) exprTypes
+    checkType program $ PT.mthType mth
+checkExpression program ctx (Var id) = do
+    t <- getVarType ctx id
+    checkType program t
