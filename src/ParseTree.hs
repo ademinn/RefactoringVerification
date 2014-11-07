@@ -1,6 +1,7 @@
-module ParseTree where
-
-import Data.List
+module ParseTree
+( module Type
+, module ParseTree
+) where
 
 import Type
 

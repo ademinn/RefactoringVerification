@@ -1,9 +1,11 @@
-module AST where
+module AST
+( module ParseTree
+, module AST
+) where
 
 import qualified Data.Map as Map
 
-import ParseTree (Identifier, Variable, Expression)
-import Type
+import ParseTree (Identifier, Variable (..), Expression (..), Type)
 
 type Program = Map.Map Identifier Class
 
