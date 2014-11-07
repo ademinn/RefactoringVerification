@@ -1,7 +1,8 @@
-module Checker where
+module Checker (checkProgram) where
 
 import Data.Maybe
 import Data.List
+import Data.Function (on)
 import qualified Data.Set as Set
 import qualified Data.Map.Lazy as Map
 import Control.Applicative
@@ -19,10 +20,19 @@ check False s = throwError s
 checkUnique :: (a -> a -> Bool) -> (a -> String) -> [a] -> Checker ()
 checkUnique eqFunc showErr ls = mapM_ checkElem ls
     where
-        checkElem e = check (length (filter (eqFunc e) ls) <= 1) $ showErr e
+        checkElem e = check (length (filter (eqFunc e) ls) == 1) $ showErr e
+
+checkUnique' :: (Eq b, Show b) => (a -> b) -> [a] -> String -> Checker ()
+checkUnique' f ls name = checkUnique ((==) `on` f) (\x -> name ++ " " ++ (show . f $ x) ++ " already exists") ls
 
 checkVariablesUnique :: [Variable] -> Checker ()
-checkVariablesUnique = checkUnique (\(Variable _ n1) (Variable _ n2) -> n1 == n2) (\v -> "Variable " ++ (show . varName $ v) ++ " already exists")
+checkVariablesUnique ls = checkUnique' varName ls "Variable"
+
+checkMethodsUnique :: [PT.Method] -> Checker ()
+checkMethodsUnique ls = checkUnique' PT.mthName ls "Method"
+
+checkClassesUnique :: [PT.Class] -> Checker ()
+checkClassesUnique ls = checkUnique' PT.clsName ls "Class"
 
 getClass :: PT.Program -> Type -> Maybe PT.Class
 getClass program t = find (\cls -> PT.clsName cls == t) program
@@ -61,13 +71,30 @@ getMethod cls mName = case find (\mth -> PT.mthName mth == mName) $ PT.clsMethod
     Nothing -> throwError $ "Field " ++ mName ++ " not found"
 
 checkProgram :: PT.Program -> Checker Program
-checkProgram = undefined
+checkProgram program = do
+    checkClassesUnique program
+    Map.fromList <$> mapM (checkClass program) program
+
+checkClass :: PT.Program -> PT.Class -> Checker (Identifier, Class)
+checkClass program cls@(PT.Class clsN _ clsCs _) = do
+    fs <- checkFields program cls
+    let consCount = length clsCs
+    check (consCount > 0) "No constructor found"
+    check (consCount < 2) "Only one constructor allowed"
+    cons <- checkConstructor program cls $ head clsCs
+    ms <- checkMethods program cls
+    return (clsN, Class fs cons ms)
 
 checkFields :: PT.Program -> PT.Class -> Checker (Map.Map Identifier Type)
 checkFields program (PT.Class _ fs _ _) = do
     checkVariablesTypes program fs
     checkVariablesUnique fs
     return . Map.fromList $ map (\(Variable t n) -> (n, t)) fs
+
+checkMethods :: PT.Program -> PT.Class -> Checker (Map.Map Identifier Method)
+checkMethods program cls@(PT.Class _ _ _ ms) = do
+    checkMethodsUnique ms
+    Map.fromList <$> mapM (checkMethod program cls) ms
 
 checkConstructor :: PT.Program -> PT.Class -> PT.Constructor -> Checker Constructor
 checkConstructor program (PT.Class clsN clsFs _ _) (PT.Constructor consN consPs consB) = do
@@ -83,14 +110,14 @@ checkConstructor program (PT.Class clsN clsFs _ _) (PT.Constructor consN consPs 
         consFields = map PT.field consB
         consValues = map PT.value consB
 
-checkMethod :: PT.Program -> PT.Class -> PT.Method -> Checker Method
-checkMethod program cls (PT.Method mthT _ mthPs mthE) = do
+checkMethod :: PT.Program -> PT.Class -> PT.Method -> Checker (Identifier, Method)
+checkMethod program cls (PT.Method mthT mthN mthPs mthE) = do
     void $ checkType program mthT
     checkVariablesTypes program mthPs
     checkVariablesUnique mthPs
     let ctx = Variable (PT.clsName cls) "this" : mthPs
     void $ checkExpression program ctx mthE
-    return $ Method mthPs mthE
+    return (mthN, Method mthT mthPs mthE)
 
 checkExpression :: PT.Program -> [Variable] -> Expression -> Checker PT.Class
 checkExpression program ctx (PT.New t ps) = do

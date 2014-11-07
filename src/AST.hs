@@ -21,7 +21,8 @@ type Constructor = [Variable]
 
 data Method
     = Method
-    { params :: [Variable]
+    { mthType :: Type
+    , params :: [Variable]
     , body :: Expression
     }
     deriving (Eq, Show)
