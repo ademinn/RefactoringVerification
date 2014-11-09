@@ -1,4 +1,4 @@
-module Checker (checkProgram) where
+module Semantic (checkProgram) where
 
 import Data.Maybe
 import Data.List
@@ -117,7 +117,7 @@ checkMethod program cls (PT.Method mthT mthN mthPs mthE) = do
     checkVariablesUnique mthPs
     let ctx = Variable (PT.clsName cls) "this" : mthPs
     void $ checkExpression program ctx mthE
-    return (mthN, Method mthT mthPs mthE)
+    return (mthN, Method mthT ctx mthE)
 
 checkExpression :: PT.Program -> [Variable] -> Expression -> Checker PT.Class
 checkExpression program ctx (PT.New t ps) = do

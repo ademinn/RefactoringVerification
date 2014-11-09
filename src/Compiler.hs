@@ -2,7 +2,7 @@ module Main where
 
 import qualified Lexer as L
 
-import Checker
+import Semantic
 import Parser
 import Control.Monad.Except
 
