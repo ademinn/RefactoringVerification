@@ -14,7 +14,7 @@ maintainer:          ademinn@gmail.com
 build-type:          Simple
 cabal-version:       >=1.8
 
-executable hjavac
+executable verify
   main-is:          Main.hs
   hs-source-dirs:   src
   extensions:       TypeSynonymInstances, FlexibleInstances, MultiParamTypeClasses, FunctionalDependencies, FlexibleContexts
