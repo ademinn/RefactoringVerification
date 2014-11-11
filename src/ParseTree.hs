@@ -4,6 +4,7 @@ module ParseTree
 ) where
 
 import Type
+import Data.List
 
 type Program = [Class]
 
@@ -54,6 +55,12 @@ data Expression
     | FieldAccess Expression Identifier
     | MethodCall Expression Identifier [Expression]
     | Var Identifier
-    deriving (Eq, Show)
+    deriving Eq
+
+instance Show Expression where
+    show (New t ps) = "new " ++ t ++ "(" ++ intercalate ", " (map show ps) ++ ")"
+    show (FieldAccess e fN) = show e ++ "." ++ fN
+    show (MethodCall e mthN ps) = show e ++ "." ++ mthN ++ "(" ++ intercalate ", " (map show ps) ++ ")"
+    show (Var v) = v
 
 type Identifier = String

@@ -24,6 +24,6 @@ class PairFactory {
     }
 
     Pair createPair() {
-        return new Pair(this.createA(), this.createA());
+        return new Pair(this.createA(), this.createA()).copy();
     }
 }

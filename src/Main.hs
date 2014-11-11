@@ -29,9 +29,9 @@ main = do
             case (,) <$> originalProgramRes <*> modifiedProgramRes of
                 Right (originalProgram, modifiedProgram) ->
                     case checkMethodExtraction originalProgram modifiedProgram fromClass fromMethod toClass toMethod of
-                        Nothing -> print "refactoring verified"
+                        Nothing -> putStrLn "refactoring verified successfully"
                         Just (actual, expected) -> do
-                            print $ "actual" ++ show actual
-                            print $ "expected" ++ show expected
+                            putStrLn $ "actual: " ++ show actual
+                            putStrLn $ "expected: " ++ show expected
                 Left err -> print err
         Left err -> print err

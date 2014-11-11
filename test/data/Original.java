@@ -10,6 +10,10 @@ class Pair {
         this.first = first;
         this.second = second;
     }
+
+    Pair copy() {
+        return new Pair(this.first, this.second);
+    }
 }
 
 class PairFactory {

@@ -43,7 +43,7 @@ reduceMethodCall expr rType rMthN program ctx =
     case expr of
         New t ps -> New t $ map reduce ps
         FieldAccess e fN -> FieldAccess (reduce e) fN
-        MethodCall e mthN ps -> if eType == rType && mthN == rMthN then reduce mth' else mth'
+        MethodCall e mthN ps -> if eType == rType && mthN == rMthN then reduceOuterMethodCall mth' program ctx else mth'
             where
                 eType = getExpressionType e program ctx
                 e' = reduce e
@@ -59,4 +59,3 @@ checkMethodExtraction originalProgram modifiedProgram fromClassN fromMethodN toC
         expected = body $ methods (originalProgram ! fromClassN) ! fromMethodN
         fromMethod = methods (modifiedProgram ! fromClassN) ! fromMethodN
         actual = reduceMethodCall (body fromMethod) toClassN toMethodN modifiedProgram $ getMethodContext fromMethod
-        
