@@ -23,5 +23,15 @@ main = do
     let originalRes = L.runAlex original parse
         modifiedRes = L.runAlex modified parse
     case (,) <$> originalRes <*> modifiedRes of
-        Right (originalPT, modifiedPT) -> print "ok"
+        Right (originalPT, modifiedPT) -> do
+            let originalProgramRes = runExcept $ checkProgram originalPT
+                modifiedProgramRes = runExcept $ checkProgram modifiedPT
+            case (,) <$> originalProgramRes <*> modifiedProgramRes of
+                Right (originalProgram, modifiedProgram) ->
+                    case checkMethodExtraction originalProgram modifiedProgram fromClass fromMethod toClass toMethod of
+                        Nothing -> print "refactoring verified"
+                        Just (actual, expected) -> do
+                            print $ "actual" ++ show actual
+                            print $ "expected" ++ show expected
+                Left err -> print err
         Left err -> print err
