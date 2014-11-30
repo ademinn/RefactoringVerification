@@ -1,6 +1,6 @@
-module AST
+module SyntaxTree
 ( module ParseTree
-, module AST
+, module SyntaxTree
 ) where
 
 import qualified Data.Map as Map

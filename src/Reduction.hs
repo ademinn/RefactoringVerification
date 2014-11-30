@@ -2,7 +2,7 @@ module Reduction where
 
 import Data.Map (Map, (!), fromList)
 
-import AST
+import SyntaxTree
 
 type Context = Map Identifier Type
 

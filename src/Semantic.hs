@@ -9,7 +9,7 @@ import Control.Applicative
 import Control.Monad.Except
 
 import qualified ParseTree as PT
-import AST
+import SyntaxTree
 
 type Checker a = Except String a
 

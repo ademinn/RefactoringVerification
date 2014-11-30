@@ -19,7 +19,7 @@ executable verify
   hs-source-dirs:   src
   extensions:       TypeSynonymInstances, FlexibleInstances, MultiParamTypeClasses, FunctionalDependencies, FlexibleContexts
   build-depends:    base >=4.5, array >=0.4, strict >=0.3, mtl >=2.2.1, containers
-  other-modules:    Lexer, Parser, Type, ParseTree, AST, Semantic, Reduction
+  other-modules:    Lexer, Parser, Type, ParseTree, SyntaxTree, Semantic, Reduction
 
 test-suite main-suite
   type:             exitcode-stdio-1.0
