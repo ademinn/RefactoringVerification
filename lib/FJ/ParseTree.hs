@@ -1,9 +1,9 @@
-module ParseTree
-( module Type
-, module ParseTree
+module FJ.ParseTree
+( module FJ.Type
+, module FJ.ParseTree
 ) where
 
-import Type
+import FJ.Type
 import Data.List
 
 type Program = [Class]

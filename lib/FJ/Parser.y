@@ -1,9 +1,9 @@
 {
-module Parser where
+module FJ.Parser where
 
-import Lexer
-import ParseTree
-import Type
+import FJ.Lexer
+import FJ.ParseTree
+import FJ.Type
 import Data.Strict.Tuple
 import Data.Either
 import Data.Maybe

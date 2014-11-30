@@ -1,5 +1,5 @@
 {
-module Lexer where
+module FJ.Lexer where
 }
 
 %wrapper "monad"

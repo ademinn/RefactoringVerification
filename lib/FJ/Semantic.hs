@@ -1,4 +1,4 @@
-module Semantic (checkProgram) where
+module FJ.Semantic (checkProgram) where
 
 import Data.Maybe
 import Data.List
@@ -8,8 +8,8 @@ import qualified Data.Map.Lazy as Map
 import Control.Applicative
 import Control.Monad.Except
 
-import qualified ParseTree as PT
-import SyntaxTree
+import qualified FJ.ParseTree as PT
+import FJ.AST
 
 type Checker a = Except String a
 

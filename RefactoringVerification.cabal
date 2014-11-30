@@ -14,12 +14,30 @@ maintainer:          ademinn@gmail.com
 build-type:          Simple
 cabal-version:       >=1.8
 
+library
+  hs-source-dirs:   lib
+  build-depends:
+    base >=4.5,
+    array >=0.4,
+    strict >=0.3,
+    containers,
+    mtl >=2.2.1
+  exposed-modules:
+    FJ
+    FJ.AST
+    FJ.Type
+  other-modules:
+    FJ.Lexer
+    FJ.Parser
+    FJ.ParseTree
+    FJ.Semantic
+
 executable verify
   main-is:          Main.hs
   hs-source-dirs:   src
   extensions:       TypeSynonymInstances, FlexibleInstances, MultiParamTypeClasses, FunctionalDependencies, FlexibleContexts
-  build-depends:    base >=4.5, array >=0.4, strict >=0.3, mtl >=2.2.1, containers
-  other-modules:    Lexer, Parser, Type, ParseTree, SyntaxTree, Semantic, Reduction
+  build-depends:    base >=4.5, containers, RefactoringVerification
+  other-modules:    Reduction
 
 test-suite main-suite
   type:             exitcode-stdio-1.0

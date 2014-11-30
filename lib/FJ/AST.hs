@@ -1,11 +1,11 @@
-module SyntaxTree
-( module ParseTree
-, module SyntaxTree
+module FJ.AST
+( module FJ.ParseTree
+, module FJ.AST
 ) where
 
 import qualified Data.Map as Map
 
-import ParseTree (Identifier, Variable (..), Expression (..), Type)
+import FJ.ParseTree (Identifier, Variable (..), Expression (..), Type)
 
 type Program = Map.Map Identifier Class
 
