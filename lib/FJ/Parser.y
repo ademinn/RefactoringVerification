@@ -150,21 +150,34 @@ parseError t = do
 withLine :: (Int -> a) -> Alex a
 withLine f = f <$> getLineNumber
 
-data Member = MV Variable | MC Constructor | MM Method
+data Member where
+    MV :: Variable -> Member
+    MC :: Constructor -> Member
+    MM :: Method -> Member
+
+isVariable :: Member -> Maybe Variable
+isVariable (MV v) = Just v
+isVariable _ = Nothing
+
+isConstructor :: Member -> Maybe Constructor
+isConstructor (MC c) = Just c
+isConstructor _ = Nothing
+
+isMethod :: Member -> Maybe Method
+isMethod (MM m) = Just m
+isMethod _ = Nothing
+
+mapVars :: [Member] -> [Variable]
+mapVars = mapMaybe isVariable
+
+mapCons :: [Member] -> [Constructor]
+mapCons = mapMaybe isConstructor
+
+mapMths :: [Member] -> [Method]
+mapMths = mapMaybe isMethod
 
 partitionMembers :: [Member] -> ([Variable], [Constructor], [Method])
-partitionMembers members = (mapMembers isVariable, mapMembers isConstructor, mapMembers isMethod)
-    where
-        mapMembers f = mapMaybe f members
-
-        isVariable (MV v) = Just v
-        isVariable _ = Nothing
-
-        isConstructor (MC c) = Just c
-        isConstructor _ = Nothing
-        
-        isMethod (MM m) = Just m
-        isMethod _ = Nothing
+partitionMembers members = (mapVars members, mapCons members, mapMths members)
 
 buildClass :: String -> [Member] -> Class
 buildClass name members = Class name fields constructors methods

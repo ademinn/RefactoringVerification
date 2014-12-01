@@ -25,12 +25,17 @@ library
   exposed-modules:
     FJ
     FJ.AST
-    FJ.Type
   other-modules:
     FJ.Lexer
     FJ.Parser
+    FJ.Type
+    FJ.Expression
     FJ.ParseTree
     FJ.Semantic
+  extensions:
+    GADTs,
+    StandaloneDeriving,
+    UndecidableInstances
 
 executable verify
   main-is:          Main.hs
