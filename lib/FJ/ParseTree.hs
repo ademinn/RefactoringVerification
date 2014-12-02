@@ -1,10 +1,6 @@
-module FJ.ParseTree
-( module FJ.Type
-, module FJ.ParseTree
-) where
+module FJ.ParseTree where
 
-import FJ.Type
-import Data.List
+import FJ.Common
 
 type Program = [Class]
 
@@ -14,13 +10,6 @@ data Class
     , clsFields :: [Variable]
     , clsConstructors :: [Constructor]
     , clsMethods :: [Method]
-    }
-    deriving (Eq, Show)
-
-data Variable
-    = Variable
-    { varType :: Type
-    , varName :: String
     }
     deriving (Eq, Show)
 
@@ -37,7 +26,7 @@ data Method
     { mthType :: Type
     , mthName :: String
     , mthParams :: [Variable]
-    , mthExpr :: Expression
+    , mthExpr :: RawExpression
     }
     deriving (Eq, Show)
 
@@ -50,17 +39,17 @@ data Assign
     }
     deriving (Eq, Show)
 
-data Expression
-    = New Type [Expression]
-    | FieldAccess Expression Identifier
-    | MethodCall Expression Identifier [Expression]
-    | Var Identifier
-    deriving Eq
-
-instance Show Expression where
-    show (New t ps) = "new " ++ t ++ "(" ++ intercalate ", " (map show ps) ++ ")"
-    show (FieldAccess e fN) = show e ++ "." ++ fN
-    show (MethodCall e mthN ps) = show e ++ "." ++ mthN ++ "(" ++ intercalate ", " (map show ps) ++ ")"
-    show (Var v) = v
-
-type Identifier = String
+--data Expression
+--    = New Type [Expression]
+--    | FieldAccess Expression Identifier
+--    | MethodCall Expression Identifier [Expression]
+--    | Var Identifier
+--    deriving Eq
+--
+--instance Show Expression where
+--    show (New t ps) = "new " ++ t ++ "(" ++ intercalate ", " (map show ps) ++ ")"
+--    show (FieldAccess e fN) = show e ++ "." ++ fN
+--    show (MethodCall e mthN ps) = show e ++ "." ++ mthN ++ "(" ++ intercalate ", " (map show ps) ++ ")"
+--    show (Var v) = v
+--
+--type Identifier = String

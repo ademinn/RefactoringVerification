@@ -3,10 +3,11 @@ module FJ.Parser where
 
 import FJ.Lexer
 import FJ.ParseTree
-import FJ.Type
+import FJ.Common
 import Data.Strict.Tuple
 import Data.Either
 import Data.Maybe
+import Control.Monad.Identity
 }
 
 %name parse
@@ -115,24 +116,24 @@ Parameter :: { Variable }
 Parameter
     : Type identifier   { Variable $1 $2 }
 
-Expression :: { Expression }
+Expression :: { RawExpression }
 Expression
-    : new Type Expressions { New $2 $3 }
-    | Expression "." identifier  { FieldAccess $1 $3 }
-    | Expression "." identifier Expressions { MethodCall $1 $3 $4 }
-    | identifier { Var $1 }
-    | this { Var "this" }
+    : new Type Expressions { Identity $ New $2 $3 }
+    | Expression "." identifier  { Identity $ FieldAccess $1 $3 }
+    | Expression "." identifier Expressions { Identity $ MethodCall $1 $3 $4 }
+    | identifier { Identity $ Var $1 }
+    | this { Identity $ Var "this" }
 
-Expressions :: { [Expression] }
+Expressions :: { [RawExpression] }
 Expressions
     : "(" ExpressionList ")"    { $2 }
 
-ExpressionList :: { [Expression] }
+ExpressionList :: { [RawExpression] }
 ExpressionList
     : ExpressionListRev { reverse $1 }
     | {- empty -}   { [] }
 
-ExpressionListRev :: { [Expression] }
+ExpressionListRev :: { [RawExpression] }
 ExpressionListRev
     : ExpressionListRev "," Expression  { $3 : $1 }
     | Expression    { [$1] }

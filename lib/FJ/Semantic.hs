@@ -7,6 +7,7 @@ import qualified Data.Set as Set
 import qualified Data.Map.Lazy as Map
 import Control.Applicative
 import Control.Monad.Except
+import Control.Monad.Identity
 
 import qualified FJ.ParseTree as PT
 import FJ.AST
@@ -48,7 +49,7 @@ checkVariableType program var = void $ checkType program $ varType var
 checkVariablesTypes :: PT.Program -> [Variable] -> Checker ()
 checkVariablesTypes program = mapM_ (checkVariableType program)
 
-getVarType :: [Variable] -> PT.Identifier -> Checker Type
+getVarType :: [Variable] -> Identifier -> Checker Type
 getVarType vars vName = if null tVars
     then 
         throwError $ "no variable " ++ vName ++ " found"
@@ -61,7 +62,7 @@ checkParameters :: [Variable] -> [Type] -> Checker ()
 checkParameters ps types = check (map varType ps == types) "incompatible types"
 
 getField :: PT.Class -> Identifier -> Checker Variable
-getField cls fName = case find (\field -> PT.varName field == fName) $ PT.clsFields cls of
+getField cls fName = case find (\field -> varName field == fName) $ PT.clsFields cls of
     Just f -> return f
     Nothing -> throwError $ "Field " ++ fName ++ " not found"
 
@@ -116,25 +117,32 @@ checkMethod program cls (PT.Method mthT mthN mthPs mthE) = do
     checkVariablesTypes program mthPs
     checkVariablesUnique mthPs
     let ctx = Variable (PT.clsName cls) "this" : mthPs
-    void $ checkExpression program ctx mthE
-    return (mthN, Method mthT ctx mthE)
+    mthTE <- checkExpression program ctx mthE
+    return (mthN, Method mthT ctx mthTE)
 
-checkExpression :: PT.Program -> [Variable] -> Expression -> Checker PT.Class
-checkExpression program ctx (PT.New t ps) = do
+checkExpression :: PT.Program -> [Variable] -> RawExpression -> Checker TypedExpression
+checkExpression program ctx (Identity (New t ps)) = do
     newCls <- checkType program t
-    exprTypes <- mapM (\e -> PT.clsName <$> checkExpression program ctx e) ps
-    checkParameters  (PT.consParams . head . PT.clsConstructors $ newCls) exprTypes
-    return newCls
-checkExpression program ctx (PT.FieldAccess expr field) = do
-    exprCls <- checkExpression program ctx expr
+    psTE <- mapM (checkExpression program ctx) ps
+    checkParameters  (PT.consParams . head . PT.clsConstructors $ newCls) $ map valueType psTE
+    return . Typed t $ New t psTE
+checkExpression program ctx (Identity (FieldAccess expr field)) = do
+    exprTE <- checkExpression program ctx expr
+    let exprT = valueType exprTE
+    exprCls <- checkType program exprT
     f <- getField exprCls field
-    checkType program $ PT.varType f
-checkExpression program ctx (PT.MethodCall subExpr mthN ps) = do
-    subCls <- checkExpression program ctx subExpr
-    exprTypes <- mapM (\e -> PT.clsName <$> checkExpression program ctx e) ps
+    void $ checkType program $ varType f
+    return . Typed exprT $ FieldAccess exprTE field
+checkExpression program ctx (Identity (MethodCall subExpr mthN ps)) = do
+    subTE <- checkExpression program ctx subExpr
+    subCls <- checkType program $ valueType subTE
+    psTE <- mapM (checkExpression program ctx) ps
     mth <- getMethod subCls mthN
-    checkParameters (PT.mthParams mth) exprTypes
-    checkType program $ PT.mthType mth
-checkExpression program ctx (PT.Var vName) = do
+    let mthT = PT.mthType mth
+    checkParameters (PT.mthParams mth) $ map valueType psTE
+    void $ checkType program mthT
+    return . Typed mthT $ MethodCall subTE mthN psTE
+checkExpression program ctx (Identity (Var vName)) = do
     t <- getVarType ctx vName
-    checkType program t
+    void $ checkType program t
+    return . Typed t $ Var vName

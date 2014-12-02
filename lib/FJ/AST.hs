@@ -1,11 +1,11 @@
 module FJ.AST
-( module FJ.ParseTree
+( module FJ.Common
 , module FJ.AST
 ) where
 
 import qualified Data.Map as Map
 
-import FJ.ParseTree (Identifier, Variable (..), Expression (..), Type)
+import FJ.Common
 
 type Program = Map.Map Identifier Class
 
@@ -23,6 +23,6 @@ data Method
     = Method
     { mthType :: Type
     , params :: [Variable]
-    , body :: Expression
+    , body :: TypedExpression
     }
     deriving (Eq, Show)

@@ -1,10 +1,18 @@
-module FJ.Expression where
+module FJ.Common where
 
-import FJ.Type
 import Data.List
 import Control.Monad.Identity
 
+type Type = String
+
 type Identifier = String
+
+data Variable
+    = Variable
+    { varType :: Type
+    , varName :: String
+    }
+    deriving (Eq, Show)
 
 class Holder a where
     getValue :: a b -> b
@@ -12,11 +20,15 @@ class Holder a where
 instance Holder Identity where
     getValue = runIdentity
 
-data Typed a = Typed Type a
+data Typed a =
+    Typed
+    { valueType :: Type
+    , value :: a
+    }
     deriving (Eq, Show)
 
 instance Holder Typed where
-    getValue (Typed _ x) = x
+    getValue = value
 
 data Expression a where
     New :: (Holder a) =>  Type  -> [a (Expression a)] -> Expression a
@@ -25,6 +37,8 @@ data Expression a where
     Var :: (Holder a) => Identifier -> Expression a
 
 deriving instance (Eq (a (Expression a))) => Eq (Expression a)
+
+type RawExpression = Identity (Expression Identity)
 
 type TypedExpression = Typed (Expression Typed)
 

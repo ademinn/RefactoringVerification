@@ -28,8 +28,7 @@ library
   other-modules:
     FJ.Lexer
     FJ.Parser
-    FJ.Type
-    FJ.Expression
+    FJ.Common
     FJ.ParseTree
     FJ.Semantic
   extensions:
