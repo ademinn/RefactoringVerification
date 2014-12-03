@@ -34,8 +34,9 @@ reduceMethodCall (Typed t expr) rType rMthN program =
     Typed t $ case expr of
         New _ ps -> New t $ map reduce ps
         FieldAccess e fN -> FieldAccess (reduce e) fN
-        MethodCall e mthN ps -> value $ if t == rType && mthN == rMthN then reduceOuterMethodCall mth' program else mth'
+        MethodCall e mthN ps -> value $ if eType == rType && mthN == rMthN then reduceOuterMethodCall mth' program else mth'
             where
+                eType = valueType e
                 e' = reduce e
                 ps' = map reduce ps
                 mth' = Typed t $ MethodCall e' mthN ps'

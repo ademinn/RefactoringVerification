@@ -25,7 +25,10 @@ data Typed a =
     { valueType :: Type
     , value :: a
     }
-    deriving (Eq, Show)
+    deriving Eq
+
+instance Show a => Show (Typed a) where
+    show = show . value
 
 instance Holder Typed where
     getValue = value
