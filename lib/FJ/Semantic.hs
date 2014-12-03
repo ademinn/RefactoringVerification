@@ -59,7 +59,7 @@ getVarType vars vName = if null tVars
         tVars = mapMaybe (\(Variable t n) -> if n == vName then Just t else Nothing) vars
 
 checkParameters :: [Variable] -> [Type] -> Checker ()
-checkParameters ps types = check (map varType ps == types) "incompatible types"
+checkParameters ps types = check (map varType ps == types) $ "incompatible types " ++ show (map varType ps) ++ " " ++ show types
 
 getField :: PT.Class -> Identifier -> Checker Variable
 getField cls fName = case find (\field -> varName field == fName) $ PT.clsFields cls of
@@ -124,15 +124,16 @@ checkExpression :: PT.Program -> [Variable] -> RawExpression -> Checker TypedExp
 checkExpression program ctx (Identity (New t ps)) = do
     newCls <- checkType program t
     psTE <- mapM (checkExpression program ctx) ps
-    checkParameters  (PT.consParams . head . PT.clsConstructors $ newCls) $ map valueType psTE
+    checkParameters (PT.consParams . head . PT.clsConstructors $ newCls) $ map valueType psTE
     return . Typed t $ New t psTE
 checkExpression program ctx (Identity (FieldAccess expr field)) = do
     exprTE <- checkExpression program ctx expr
     let exprT = valueType exprTE
     exprCls <- checkType program exprT
     f <- getField exprCls field
-    void $ checkType program $ varType f
-    return . Typed exprT $ FieldAccess exprTE field
+    let fieldT = varType f
+    void $ checkType program fieldT
+    return . Typed fieldT $ FieldAccess exprTE field
 checkExpression program ctx (Identity (MethodCall subExpr mthN ps)) = do
     subTE <- checkExpression program ctx subExpr
     subCls <- checkType program $ valueType subTE
