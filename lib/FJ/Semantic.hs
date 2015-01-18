@@ -14,6 +14,9 @@ import FJ.AST
 
 type Checker a = Except String a
 
+objectClass :: PT.Class
+objectClass = PT.Class "Object" "Object" [] [PT.Constructor "Object" [] $ PT.ConsBlock [] []] []
+
 check :: Bool -> String -> Checker ()
 check True _ = return ()
 check False s = throwError s
@@ -61,20 +64,27 @@ getVarType vars vName = if null tVars
 checkParameters :: [Variable] -> [Type] -> Checker ()
 checkParameters ps types = check (map varType ps == types) $ "incompatible types " ++ show (map varType ps) ++ " " ++ show types
 
-getField :: PT.Class -> Identifier -> Checker Variable
-getField cls fName = case find (\field -> varName field == fName) $ PT.clsFields cls of
+getField :: PT.Program -> PT.Class -> Identifier -> Checker Variable
+getField _ (PT.Class "Object" _ _ _ _) fName = throwError $ "Field " ++ fName ++ " not found"
+getField program cls fName = case find (\field -> varName field == fName) $ PT.clsFields cls of
     Just f -> return f
-    Nothing -> throwError $ "Field " ++ fName ++ " not found"
+    Nothing -> do
+        baseCls <- checkType program (PT.clsBase cls)
+        getField program baseCls fName
 
-getMethod :: PT.Class -> Identifier -> Checker PT.Method
-getMethod cls mName = case find (\mth -> PT.mthName mth == mName) $ PT.clsMethods cls of
+getMethod :: PT.Program -> PT.Class -> Identifier -> Checker PT.Method
+getMethod _ (PT.Class "Object" _ _ _ _) mName = throwError $ "Field " ++ mName ++ " not found"
+getMethod program cls mName = case find (\mth -> PT.mthName mth == mName) $ PT.clsMethods cls of
     Just m -> return m
-    Nothing -> throwError $ "Field " ++ mName ++ " not found"
+    Nothing -> do
+        baseCls <- checkType program (PT.clsBase cls)
+        getMethod program baseCls mName
 
 checkProgram :: PT.Program -> Checker Program
 checkProgram program = do
-    checkClassesUnique program
-    Map.fromList <$> mapM (checkClass program) program
+    let fullProgram = objectClass : program
+    checkClassesUnique fullProgram
+    Map.fromList <$> mapM (checkClass fullProgram) program
 
 checkClass :: PT.Program -> PT.Class -> Checker (Identifier, Class)
 checkClass program cls@(PT.Class clsN baseClsN _ clsCs _) = do
@@ -98,18 +108,22 @@ checkMethods program cls@(PT.Class _ _ _ _ ms) = do
     Map.fromList <$> mapM (checkMethod program cls) ms
 
 checkConstructor :: PT.Program -> PT.Class -> PT.Constructor -> Checker Constructor
-checkConstructor program (PT.Class clsN _ clsFs _ _) (PT.Constructor consN consPs consB) = do
+checkConstructor program (PT.Class clsN baseClsN clsFs _ _) (PT.Constructor consN consPs (PT.ConsBlock scParams assigns)) = do
+    baseCls <- checkType program baseClsN
+    let checkEqLists l1 l2 = check (Set.fromList l1 == Set.fromList l2) $ show l1 ++ " not equal to " ++ show l2
+        baseClsConsParams = PT.consParams . head . PT.clsConstructors $ baseCls
+        (baseConsPs, clsConsPs) = splitAt (length baseClsConsParams) consPs
+        varNames = map varName
+        consFields = map PT.field assigns
+        consValues = map PT.value assigns
     check (clsN == consN) "bad constructor name"
     checkVariablesTypes program consPs
     checkVariablesUnique consPs
+    checkParameters baseClsConsParams (map varType baseConsPs)
+    checkEqLists (varNames baseConsPs) scParams
     checkEqLists (varNames clsFs) consFields
-    checkEqLists (varNames consPs) consValues
+    checkEqLists (varNames clsConsPs) consValues
     return consPs
-    where
-        checkEqLists l1 l2 = check (Set.fromList l1 == Set.fromList l2) $ show l1 ++ " not equal to " ++ show l2
-        varNames = map varName
-        consFields = map PT.field $ PT.assignList consB
-        consValues = map PT.value $ PT.assignList consB
 
 checkMethod :: PT.Program -> PT.Class -> PT.Method -> Checker (Identifier, Method)
 checkMethod program cls (PT.Method mthT mthN mthPs mthE) = do
@@ -130,7 +144,7 @@ checkExpression program ctx (Identity (FieldAccess expr field)) = do
     exprTE <- checkExpression program ctx expr
     let exprT = valueType exprTE
     exprCls <- checkType program exprT
-    f <- getField exprCls field
+    f <- getField program exprCls field
     let fieldT = varType f
     void $ checkType program fieldT
     return . Typed fieldT $ FieldAccess exprTE field
@@ -138,7 +152,7 @@ checkExpression program ctx (Identity (MethodCall subExpr mthN ps)) = do
     subTE <- checkExpression program ctx subExpr
     subCls <- checkType program $ valueType subTE
     psTE <- mapM (checkExpression program ctx) ps
-    mth <- getMethod subCls mthN
+    mth <- getMethod program subCls mthN
     let mthT = PT.mthType mth
     checkParameters (PT.mthParams mth) $ map valueType psTE
     void $ checkType program mthT
