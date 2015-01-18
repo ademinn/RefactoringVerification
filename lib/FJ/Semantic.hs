@@ -77,28 +77,28 @@ checkProgram program = do
     Map.fromList <$> mapM (checkClass program) program
 
 checkClass :: PT.Program -> PT.Class -> Checker (Identifier, Class)
-checkClass program cls@(PT.Class clsN _ clsCs _) = do
+checkClass program cls@(PT.Class clsN baseClsN _ clsCs _) = do
     fs <- checkFields program cls
     let consCount = length clsCs
     check (consCount > 0) "No constructor found"
     check (consCount < 2) "Only one constructor allowed"
     cons <- checkConstructor program cls $ head clsCs
     ms <- checkMethods program cls
-    return (clsN, Class fs cons ms)
+    return (clsN, Class baseClsN fs cons ms)
 
 checkFields :: PT.Program -> PT.Class -> Checker (Map.Map Identifier Type)
-checkFields program (PT.Class _ fs _ _) = do
+checkFields program (PT.Class _ _ fs _ _) = do
     checkVariablesTypes program fs
     checkVariablesUnique fs
     return . Map.fromList $ map (\(Variable t n) -> (n, t)) fs
 
 checkMethods :: PT.Program -> PT.Class -> Checker (Map.Map Identifier Method)
-checkMethods program cls@(PT.Class _ _ _ ms) = do
+checkMethods program cls@(PT.Class _ _ _ _ ms) = do
     checkMethodsUnique ms
     Map.fromList <$> mapM (checkMethod program cls) ms
 
 checkConstructor :: PT.Program -> PT.Class -> PT.Constructor -> Checker Constructor
-checkConstructor program (PT.Class clsN clsFs _ _) (PT.Constructor consN consPs consB) = do
+checkConstructor program (PT.Class clsN _ clsFs _ _) (PT.Constructor consN consPs consB) = do
     check (clsN == consN) "bad constructor name"
     checkVariablesTypes program consPs
     checkVariablesUnique consPs
@@ -108,8 +108,8 @@ checkConstructor program (PT.Class clsN clsFs _ _) (PT.Constructor consN consPs 
     where
         checkEqLists l1 l2 = check (Set.fromList l1 == Set.fromList l2) $ show l1 ++ " not equal to " ++ show l2
         varNames = map varName
-        consFields = map PT.field consB
-        consValues = map PT.value consB
+        consFields = map PT.field $ PT.assignList consB
+        consValues = map PT.value $ PT.assignList consB
 
 checkMethod :: PT.Program -> PT.Class -> PT.Method -> Checker (Identifier, Method)
 checkMethod program cls (PT.Method mthT mthN mthPs mthE) = do

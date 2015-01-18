@@ -11,7 +11,8 @@ type Program = Map.Map Identifier Class
 
 data Class
     = Class
-    { fields :: Map.Map Identifier Type
+    { base :: Identifier
+    , fields :: Map.Map Identifier Type
     , constructor :: Constructor
     , methods :: Map.Map Identifier Method
     }

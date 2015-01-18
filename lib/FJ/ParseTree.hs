@@ -7,6 +7,7 @@ type Program = [Class]
 data Class
     = Class
     { clsName :: String
+    , clsBase :: Identifier
     , clsFields :: [Variable]
     , clsConstructors :: [Constructor]
     , clsMethods :: [Method]
@@ -30,7 +31,12 @@ data Method
     }
     deriving (Eq, Show)
 
-type ConsBlock = [Assign]
+data ConsBlock
+     = ConsBlock
+     { superCallParams :: [Identifier]
+     , assignList :: [Assign]
+     }
+     deriving (Eq, Show)
 
 data Assign
     = Assign

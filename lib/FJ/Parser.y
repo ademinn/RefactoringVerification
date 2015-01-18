@@ -21,6 +21,8 @@ import Control.Monad.Identity
     return      { TKeyword "return"   }
     this        { TKeyword "this"     }
     new         { TKeyword "new"      }
+    extends     { TKeyword "extends"  }
+    super       { TKeyword "super"    }
 
     "("         { TOperator "(" }
     ")"         { TOperator ")"  }
@@ -52,7 +54,7 @@ ClassListRev
 
 Class :: { Class }
 Class
-    : class identifier "{" MemberList "}"       { buildClass $2 $4 }
+    : class identifier extends identifier "{" MemberList "}"       { buildClass $2 $4 $6 }
 
 MemberList :: { [Member] }
 MemberList
@@ -83,11 +85,21 @@ ConstructorDefinition
 
 ConsBlock :: { ConsBlock }
 ConsBlock
-    : "{" AssignList "}"    { $2 }
+    : "{" super "(" SuperInitList ")" ";" AssignList "}"    { ConsBlock $4 $7 }
+
+SuperInitList :: { [Identifier] }
+SuperInitList
+    : SuperInitListRev  { reverse $1 }
+    | {- empty -}   { [] }
+
+SuperInitListRev :: { [Identifier] }
+SuperInitListRev
+    : SuperInitListRev "," identifier   { $3 : $1 }
+    | identifier    { [$1] }
 
 AssignList :: { [Assign] }
 AssignList
-    : AssignListRev { $1 }
+    : AssignListRev { reverse $1 }
 
 AssignListRev :: { [Assign] }
 AssignListRev
@@ -180,8 +192,8 @@ mapMths = mapMaybe isMethod
 partitionMembers :: [Member] -> ([Variable], [Constructor], [Method])
 partitionMembers members = (mapVars members, mapCons members, mapMths members)
 
-buildClass :: String -> [Member] -> Class
-buildClass name members = Class name fields constructors methods
+buildClass :: String -> String -> [Member] -> Class
+buildClass name nameBase members = Class name nameBase fields constructors methods
     where (fields, constructors, methods) = partitionMembers members
 
 }

@@ -10,7 +10,7 @@ $alphanum   = [a-zA-Z0-9_]
 
 @operator = "(" | ")" | "{" | "}" | "," | ";" | "." | "="
 
-@keyword = class | return | this | new
+@keyword = class | return | this | new | extends | super
 
 tokens :-
 
