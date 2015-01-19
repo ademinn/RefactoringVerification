@@ -6,6 +6,7 @@ import Data.Function (on)
 import qualified Data.Set as Set
 import qualified Data.Map.Lazy as Map
 import Control.Applicative
+import Control.Monad
 import Control.Monad.Except
 import Control.Monad.Identity
 
@@ -61,8 +62,19 @@ getVarType vars vName = if null tVars
     where
         tVars = mapMaybe (\(Variable t n) -> if n == vName then Just t else Nothing) vars
 
-checkParameters :: [Variable] -> [Type] -> Checker ()
-checkParameters ps types = check (map varType ps == types) $ "incompatible types " ++ show (map varType ps) ++ " " ++ show types
+isSubType :: PT.Program -> Type -> Type -> Checker Bool
+isSubType program derivedT baseT
+    | derivedT == baseT = return True
+    | derivedT == "Object" = return False
+    | otherwise = do
+        derivedCls <- checkType program derivedT
+        isSubType program (PT.clsBase derivedCls) baseT
+
+checkParameters :: PT.Program -> [Variable] -> [Type] -> Checker ()
+checkParameters program ps types = do
+    let psTypes = map varType ps
+    subTypesCheck <- zipWithM (isSubType program) types psTypes
+    check (and subTypesCheck) $ "incompatible types " ++ show (map varType ps) ++ " " ++ show types
 
 getField :: PT.Program -> PT.Class -> Identifier -> Checker Variable
 getField _ (PT.Class "Object" _ _ _ _) fName = throwError $ "Field " ++ fName ++ " not found"
@@ -119,7 +131,7 @@ checkConstructor program (PT.Class clsN baseClsN clsFs _ _) (PT.Constructor cons
     check (clsN == consN) "bad constructor name"
     checkVariablesTypes program consPs
     checkVariablesUnique consPs
-    checkParameters baseClsConsParams (map varType baseConsPs)
+    checkParameters program baseClsConsParams (map varType baseConsPs)
     checkEqLists (varNames baseConsPs) scParams
     checkEqLists (varNames clsFs) consFields
     checkEqLists (varNames clsConsPs) consValues
@@ -138,7 +150,7 @@ checkExpression :: PT.Program -> [Variable] -> RawExpression -> Checker TypedExp
 checkExpression program ctx (Identity (New t ps)) = do
     newCls <- checkType program t
     psTE <- mapM (checkExpression program ctx) ps
-    checkParameters (PT.consParams . head . PT.clsConstructors $ newCls) $ map valueType psTE
+    checkParameters program (PT.consParams . head . PT.clsConstructors $ newCls) $ map valueType psTE
     return . Typed t $ New t psTE
 checkExpression program ctx (Identity (FieldAccess expr field)) = do
     exprTE <- checkExpression program ctx expr
@@ -154,7 +166,7 @@ checkExpression program ctx (Identity (MethodCall subExpr mthN ps)) = do
     psTE <- mapM (checkExpression program ctx) ps
     mth <- getMethod program subCls mthN
     let mthT = PT.mthType mth
-    checkParameters (PT.mthParams mth) $ map valueType psTE
+    checkParameters program (PT.mthParams mth) $ map valueType psTE
     void $ checkType program mthT
     return . Typed mthT $ MethodCall subTE mthN psTE
 checkExpression program ctx (Identity (Var vName)) = do
