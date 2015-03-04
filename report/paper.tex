@@ -1,0 +1,32 @@
+\documentclass[a4paper,12pt, titlepage]{article}
+\usepackage[cm]{fullpage}
+\usepackage[utf8]{inputenc}
+\usepackage[T2A]{fontenc}
+\usepackage[english]{babel}
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage{tikz-qtree}
+\usepackage{listings}
+\usepackage{upquote}
+\parindent=0em
+
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+
+\newenvironment{definition}[1][Definition]{\begin{trivlist}
+\item[\hskip \labelsep {\bfseries #1}]}{\end{trivlist}}
+
+\begin{document}
+\begin{definition}
+Reduction by method $m$ of class $C$ is a such relation, that $\forall$ expression $e$:
+\begin{enumerate}
+\item $\cfrac{e \rightarrow_{C, m} e'}{e.f \rightarrow_{C, m} e'.f}$;
+\item $\cfrac{m' \ne m \lor (e : D \land \lnot D <: C) \qquad e \rightarrow_{C, m} e' \qquad \overline{e} \rightarrow_{C, m} \overline{e}'}
+{e.m(\overline{e}) \rightarrow_{C, m} e'.m'(\overline{e}')}$;
+\item $\cfrac{e : D \qquad D <: C \qquad mbody(m, C) = \overline{x}.e_0 \qquad e \rightarrow_{C, m} e' \qquad \overline{e} \rightarrow_{C, m} \overline{e}' \qquad e_0 \rightarrow_{C, m} e_0'}
+{e.m(\overline{e}) \rightarrow_{C, m} [\overline{e}' / \overline{x}, e' / this]e_0'}$;
+\item $\cfrac{\overline{e} \rightarrow_{C, m} \overline{e}'}{new D(\overline{e}) \rightarrow_{C, m} new D(\overline{e}')}$
+\item $\cfrac{e \rightarrow_{C, m} e'}{(D)e \rightarrow_{C, m} (D)e'}$;
+\end{enumerate}
+\end{definition}
+\end{document}
