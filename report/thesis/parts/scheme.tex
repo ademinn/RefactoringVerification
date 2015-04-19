@@ -1,0 +1,46 @@
+\chapter{Описание предлагаемого подхода}
+\begin{definition}
+Строгая вычислимость
+\begin{itemize}
+    \item $\overline{e}$ вычислимо, если $\forall e \in \overline{e}\ e$ вычислимо
+    \item если $e$ вычислимо, то $e.f$ вычислимо;
+    \item если $mbody(m, C) = \overline{x}.e_0$ и вычислимы $e$, $\overline{e}$ и $[\overline{e}/\overline{x}, e/this]e_0$, то $e.m(\overline{e})$ вычислимо;
+    \item если $\overline{e}$ вычислимо, то $new\ C(\overline{e})$ вычислимо;
+    \item если $e$ вычислимо, то $(C) e$ вычислимо.
+\end{itemize}
+Если выражение содержит вызов рекурсивного метода (с прямой или косвенной рекурсией), то выражение не является строго вычислимым.
+\end{definition}
+\begin{definition}
+Выражения $e_1$ и $e_2$ назовем эквивалентными, если либо оба выражения не являются строго вычислимыми,
+либо оба выражения строго вычислимы и существует выражение $e' : e_1 \rightarrow^* e'$ и $e_2 \rightarrow^* e'$. Эквивалентные выражения будем обозначать $e_1 \equiv e_2$.
+\end{definition}
+\begin{definition}
+Пусть в классе $C$ определен метод $m : mbody(m, C) = \overline{x}.e_0$.
+Назовем метод $m$ хорошо определенным, если $e_0$ содержит все параметры метода,
+включая неявный параметр $this$. Хорошо определенные методы будем обозначать $wd(m, C)$.
+\end{definition}
+\begin{definition}
+Слабая редукция
+\begin{enumerate}
+    \item $\cfrac{\Gamma \vdash e : C \qquad mbody(m, C) = \overline{x}.e_0 \qquad wd(m, C)}{e.m(\overline{d}) \rightarrow_w [\overline{d}/\overline{x}, e/this]e_0}$
+    \item $\cfrac{C <: D}{(D)(new\ C(\overline{e})) \rightarrow_w new\ C(\overline{e})}$
+    \item $\cfrac{e \rightarrow_w e'}{e.f \rightarrow_w e'.f}$
+    \item $\cfrac{e \rightarrow_w e'}{e.m(\overline{e}) \rightarrow_w e'.m(\overline{e})}$
+    \item $\cfrac{e_i \rightarrow_w e_i'}{e.m(\ldots,e_i,\ldots) \rightarrow_w e.m(\ldots,e_i',\ldots)}$
+    \item $\cfrac{e_i \rightarrow_w e_i'}{new\ C(\ldots,e_i,\ldots) \rightarrow_w new\ C(\ldots,e_i',\ldots)}$
+    \item $\cfrac{e \rightarrow_w e'}{(C)e \rightarrow_w (C)e'}$
+\end{enumerate}
+\end{definition}
+
+\begin{lemma}
+Пусть $e \rightarrow_w e'$. Тогда $e$ строго вычислим тогда и только тогда, когда $e'$ строго вычислим.
+\end{lemma}
+
+\begin{proof}
+Для первого правила слабой редукции доказательство следует из того, что метод $m$ -- хорошо определен.
+Для всех правил слабой редукции, кроме первого, доказательство следует непосредственно из определения строгой вычислимости.
+\end{proof}
+
+\begin{theorem}
+Пусть $e \rightarrow_w e'$. Тогда $e \equiv e'$.
+\end{theorem}

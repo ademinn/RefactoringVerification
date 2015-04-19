@@ -1,0 +1,209 @@
+\chapter{Обзор предметной области}
+\section{Необходимые элементы теории формальных языков}
+\subsection{Формальные языки}
+\begin{definition}
+Алфавит -- конечное непустое множество символов.
+\end{definition}
+Далее для обозначения алфавита будет использоваться символ $\Sigma$.
+\begin{definition}
+Слово или цепочка -- конечная последовательность символов некоторого алфавита.
+\end{definition}
+\begin{definition}
+Длина цепочки -- число символов в цепочке.
+\end{definition}
+\begin{definition}
+$\Sigma^k$ -- множество цепочек длины $k$ над алфавитом $\Sigma$.
+\end{definition}
+\begin{definition}
+$\Sigma^* = \bigcup\limits_{k=0}^\infty$ -- множество всех цепочек над алфавитом $\Sigma$.
+\end{definition}
+\begin{definition}
+Формальный язык над алфавитом $\Sigma$ -- некоторое подмножество $\Sigma^*$.
+\end{definition}
+Любой язык прогроммирования является формальным языком, а корректная программа на нем -- словом этого языка.
+\subsection{Контекстно-свободные грамматики}
+Контекстно-свободная грамматика состоит из следующих компонентов:
+\begin{itemize}
+    \item алфавит, элементы которого называют терминалами;
+    \item конечно множество переменных, называемых нетерминалами; каждый нетерминал представляет формальный язык;
+    \item стартовый символ грамматики -- один из нетерминалов, представляющий определямый язык;
+    \item конечное множество правил вывода, или продукций, представляющих рекурсивное определение языка.
+    Привило вывода представляет из себя пару из нетерминала, называемого головой продукции, и конечной цепочкой,
+    состоящей из терминалов и нетерминалов, называемой телом продукции.
+\end{itemize}
+Формальное определение контекстно-свободной грамматики выглядит следующим образом.
+\begin{definition}
+Контекстно-свободная грамматика $G$ -- четверка $(\Sigma, N, S \in N, P \subset N \times (\Sigma \cup N)^*)$,
+где $\Sigma$ -- алфавит, $N$ - множество нетерминалов, $S$ -- стартовый нетерминал, $P$ -- множество правил вывода.
+\end{definition}
+Типичным примером контекстно-свободной грамматики является грамматика арифметических выражений, представленная на рисунке~\ref{cf-expr}.
+\begin{figure}[H]
+    % {\centering
+    \centering
+    \begin{varwidth}{\textwidth}
+    \begin{itemize}
+        \item[] $E \rightarrow E + E$
+        \item[] $E \rightarrow T$
+        \item[] $T \rightarrow T * T$
+        \item[] $T \rightarrow F$
+        \item[] $F \rightarrow n$
+        \item[] $F \rightarrow (E)$
+    \end{itemize}
+    \end{varwidth}
+    % }
+    \caption{Конекстно-свободная грамматика языка арифметических выражений}
+    \label{cf-expr}
+\end{figure}
+\section{Редукция}
+
+\section{Featherweight Java}
+Featherweigth Java -- чистый функциональный язык программирования,
+который является минимальным ядром для моделирования системы типов языка Java.
+\begin{figure}[H]
+\begin{itemize}
+    \item[] $Classes \rightarrow Class\ Classes$
+    \item[] $Class \rightarrow class\ ClassName\ extends\ ClassName\ \{\ Fields\ Constructor\ Methods\ \}$
+    \item[] $Fields \rightarrow Field\ Fields\ |\ \varepsilon$
+    \item[] $Field \rightarrow ClassName\ FieldName;$
+    \item[] $Constructor \rightarrow ClassName\ (\ Parameters\ )\ \{\ super\ (\ Expressions\ );\ Assigns\ \}$
+    \item[] $Assigns \rightarrow Assign\ Assigns\ |\ \varepsilon$
+    \item[] $Assing \rightarrow this\ .\ FieldName\ =\ VarName;$    
+    \item[] $Methods \rightarrow Method\ Methods\ |\ \varepsilon$
+    \item[] $Method \rightarrow ClassName\ MethodName\ (\ Parameters\ )\ \{\ return\ Expression;\ \}$
+    \item[] $Expression \rightarrow VarName\ |\ Expression\ .\ FieldName\ |\ Expression\ .\ MethodName\ (\ Expressions\ )$
+    \item[] $Expression \rightarrow new\ ClassName\ (\ Expressions\ )\ |\ (\ ClassName\ )\ Expression$
+    \item[] $Parameters \rightarrow Parameter\ ,\ Parameters\ |\ Parameter$
+    \item[] $Parameter \rightarrow ClassName\ VarName$
+    \item[] $Expressions \rightarrow Expression\ ,\ Expressions\ |\ Expression$
+    \item[] $ClassName \rightarrow id$
+    \item[] $FieldName \rightarrow id$
+    \item[] $MethdoName \rightarrow id$
+    \item[] $VarName \rightarrow id$
+    \caption{Контекстно-свободная грамматика языка Featherweight Java}
+    \label{cf-fj}
+\end{itemize}
+\end{figure}
+\begin{figure}[H]
+\begin{itemize}
+    \item[] $P = class\ C\ extends\ C\ \{\overline{C}\ \overline{f};\ K\ \overline{M}\}$
+    \item[] $K = C(\overline{C}\ \overline{f})\{super(\overline{f});\ this.\overline{f} = \overline{f};\}$
+    \item[] $M = C m(\overline{C}\ \overline{x}\{ return e; \}$
+    \item[] $e = x\ |\ e.f\ |\ e.m(\overline{e})\ |\ new\ C(\overline{e})\ |\ (C)e$
+    \caption{Сокращенное описание синтаксиса языка Featherweight Java}
+    \label{fj-syntax}
+\end{itemize}
+\end{figure}
+\section{Рефакторинг}
+У термина <<рефакторинг>> существует два определения -- рефакторинг как изменение в коде и рефакторинг как процесс внесения таких изменений.
+\begin{definition}
+Рефакторинг или рефакторное преобразование -- изменение во внутренней структуре программного обеспечения,
+имеющее целью облегчить понимание его работы и упростить модификацию, не затрагивая наблюдаемого поведения.
+\end{definition}
+\begin{definition}
+Производить рефакторинг -- изменять структуру программного обеспечения, применяя
+ряд рефакторных преобразований, не затрагивая его поведения.
+\end{definition}
+Можно выделить несколько основных целей, с которыми проводится рефакторинг:
+\begin{itemize}
+    \item улучшение композиции ПО -- после проведения рефакторинга улучшается структура кода,
+    становится проще вносить изменения в существующий код и добавлять новую функциональность;
+    \item облегчение понимания ПО -- в процессе модификации незнакомого кода проще разобраться в деталях реализации;
+    \item поиск ошибок -- при рефакторинге требуется глубоко вникать в модифицируемый код, что позволяет обнаружить ошибки;
+    кроме того, после прояснения структуры программы некоторые ошибки становятся очевидными;
+    \item ускорение разработки -- рефакторинг помогает сохранять хороший дизайн разрабатываемого ПО,
+    что положительно сказывается на скорости разработки.
+\end{itemize}
+\subsection{Методы рефакторинга}
+Рефакторное преобразование в общем смысле -- любое преобразование кода, не меняющее его поведения.
+Однако существуют шаблонные преобразования, которые встречаются очень часто.
+Такие шаблонные преобразования называют методами рефакторинга.
+Ниже приводится несколько примеров наиболее часто встречающихся методов рефакторинга.
+\subsubsection{Выделение метода}
+Выделение метода -- один из наиболее часто проводимых методов рефакторинга.
+При выделении метода фрагмент кода, который можно сгруппировать, преобразуется в метод,
+название которого обозначает его назначение.
+
+Выделение метода служит сразу двум целям:
+\begin{itemize}
+    \item избавление от дублирования кода -- при вынесении метода часто выносится код, который используется сразу в нескольких местах;
+    кроме того, если выделен мелкий метод, повышается вероятность его использования другими методами;
+    \item улучшение читаемости -- название метода служит цели документирования кода,
+    и более длинные методы начинают выглядеть, как ряд комментариев.
+\end{itemize}
+В листингах~\ref{em-before} и~\ref{em-after} представлен пример кода до и после применения метода рефакторинга <<выделение метода>> --
+создание копии объекта класса $Pair$ вынесено в метод $copy$.
+\lstset{
+    language=Java,
+    basicstyle=\small\ttfamily,
+    frame=single,
+    captionpos=b
+}
+%\begin{minipage}{\linewidth}
+\begin{lstlisting}[float,floatplacement=H,label=em-before,caption=Код до проведения рефакторинга]
+class A extends Object {
+    A() {
+        super();
+    }
+}
+
+class Pair extends Object {
+    Object first;
+    Object second;
+
+    Pair(Object first, Object second) {
+        super();
+        this.first = first;
+        this.second = second;
+    }
+}
+
+class PairFactory extends Object {
+    Pair template;
+
+    PairFactory(Pair template) {
+        super();
+        this.template = template;
+    }
+
+    Pair createPair() {
+        return new Pair(this.template.first, this.template.second);
+    }
+}
+\end{lstlisting}
+%\end{minipage}
+\begin{lstlisting}[float,floatplacement=h,label=em-after,caption=Код после вынесения метода]
+class A extends Object {
+    A() {
+        super();
+    }
+}
+
+class Pair extends Object {
+    Object first;
+    Object second;
+
+    Pair(Object first, Object second) {
+        super();
+        this.first = first;
+        this.second = second;
+    }
+
+    Pair copy() {
+        return new Pair(this.first, this.second);
+    }
+}
+
+class PairFactory extends Object {
+    Pair template;
+
+    PairFactory(Pair template) {
+        super();
+        this.template = template;
+    }
+
+    Pair createPair() {
+        return this.template.copy();
+    }
+}
+\end{lstlisting}
+\section{Статическая верификация}
