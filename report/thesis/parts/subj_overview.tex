@@ -38,19 +38,14 @@ $\Sigma^* = \bigcup\limits_{k=0}^\infty$ -- множество всех цепо
 \end{definition}
 Типичным примером контекстно-свободной грамматики является грамматика арифметических выражений, представленная на рисунке~\ref{cf-expr}.
 \begin{figure}[H]
-    % {\centering
-    \centering
-    \begin{varwidth}{\textwidth}
-    \begin{itemize}
-        \item[] $E \rightarrow E + E$
-        \item[] $E \rightarrow T$
-        \item[] $T \rightarrow T * T$
-        \item[] $T \rightarrow F$
-        \item[] $F \rightarrow n$
-        \item[] $F \rightarrow (E)$
-    \end{itemize}
-    \end{varwidth}
-    % }
+    \begin{align*}
+        E \rightarrow&\ E + E\\
+        E \rightarrow&\ T\\
+        T \rightarrow&\ T * T\\
+        T \rightarrow&\ F\\
+        F \rightarrow&\ (E)\\
+        F \rightarrow&\ n
+    \end{align*}
     \caption{Конекстно-свободная грамматика языка арифметических выражений}
     \label{cf-expr}
 \end{figure}
@@ -59,39 +54,16 @@ $\Sigma^* = \bigcup\limits_{k=0}^\infty$ -- множество всех цепо
 \section{Featherweight Java}
 Featherweigth Java -- чистый функциональный язык программирования,
 который является минимальным ядром для моделирования системы типов языка Java.
+
 \begin{figure}[H]
-\begin{itemize}
-    \item[] $Classes \rightarrow Class\ Classes$
-    \item[] $Class \rightarrow class\ ClassName\ extends\ ClassName\ \{\ Fields\ Constructor\ Methods\ \}$
-    \item[] $Fields \rightarrow Field\ Fields\ |\ \varepsilon$
-    \item[] $Field \rightarrow ClassName\ FieldName;$
-    \item[] $Constructor \rightarrow ClassName\ (\ Parameters\ )\ \{\ super\ (\ Expressions\ );\ Assigns\ \}$
-    \item[] $Assigns \rightarrow Assign\ Assigns\ |\ \varepsilon$
-    \item[] $Assing \rightarrow this\ .\ FieldName\ =\ VarName;$    
-    \item[] $Methods \rightarrow Method\ Methods\ |\ \varepsilon$
-    \item[] $Method \rightarrow ClassName\ MethodName\ (\ Parameters\ )\ \{\ return\ Expression;\ \}$
-    \item[] $Expression \rightarrow VarName\ |\ Expression\ .\ FieldName\ |\ Expression\ .\ MethodName\ (\ Expressions\ )$
-    \item[] $Expression \rightarrow new\ ClassName\ (\ Expressions\ )\ |\ (\ ClassName\ )\ Expression$
-    \item[] $Parameters \rightarrow Parameter\ ,\ Parameters\ |\ Parameter$
-    \item[] $Parameter \rightarrow ClassName\ VarName$
-    \item[] $Expressions \rightarrow Expression\ ,\ Expressions\ |\ Expression$
-    \item[] $ClassName \rightarrow id$
-    \item[] $FieldName \rightarrow id$
-    \item[] $MethdoName \rightarrow id$
-    \item[] $VarName \rightarrow id$
-    \caption{Контекстно-свободная грамматика языка Featherweight Java}
-    \label{cf-fj}
-\end{itemize}
-\end{figure}
-\begin{figure}[H]
-\begin{itemize}
-    \item[] $P = class\ C\ extends\ C\ \{\overline{C}\ \overline{f};\ K\ \overline{M}\}$
-    \item[] $K = C(\overline{C}\ \overline{f})\{super(\overline{f});\ this.\overline{f} = \overline{f};\}$
-    \item[] $M = C m(\overline{C}\ \overline{x}\{ return e; \}$
-    \item[] $e = x\ |\ e.f\ |\ e.m(\overline{e})\ |\ new\ C(\overline{e})\ |\ (C)e$
+    \begin{align*}
+        P =&\ class\ C\ extends\ C\ \{\overline{C}\ \overline{f};\ K\ \overline{M}\}\\
+        K =&\ C(\overline{C}\ \overline{f})\{\ super(\overline{f});\ this.\overline{f} = \overline{f};\ \}\\
+        M =&\ C\ m(\overline{C}\ \overline{x}\{\ return\ e;\ \}\\
+        e =&\ x\ |\ e.f\ |\ e.m(\overline{e})\ |\ new\ C(\overline{e})\ |\ (C)e
+    \end{align*}
     \caption{Сокращенное описание синтаксиса языка Featherweight Java}
     \label{fj-syntax}
-\end{itemize}
 \end{figure}
 \section{Рефакторинг}
 У термина <<рефакторинг>> существует два определения -- рефакторинг как изменение в коде и рефакторинг как процесс внесения таких изменений.

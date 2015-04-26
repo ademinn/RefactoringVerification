@@ -1,0 +1,39 @@
+\chapter{Практическая реализация}
+\section{Разбор Featherweight Java}
+\subsection{Лексический анализатор}
+Для разбиения исходного кода на токены использовался генератор лексических анализаторов Alex~\cite{alex}.
+\subsection{Синтаксический анализатор}
+\begin{figure}[H]
+    \begin{align*}
+        Classes \rightarrow&\ Class\ Classes\\
+        Class \rightarrow&\ class\ ClassName\ extends\ ClassName\\
+        &\ \{\ Fields\ Constructor\ Methods\ \}\\
+        Fields \rightarrow&\ Field\ Fields\ |\ \varepsilon\\
+        Field \rightarrow&\ ClassName\ FieldName;\\
+        Constructor \rightarrow& \ ClassName\ (\ Parameters\ )\\
+        &\ \{\ super\ (\ Expressions\ );\ Assigns\ \}\\
+        Assigns \rightarrow&\ Assign\ Assigns\ |\ \varepsilon\\
+        Assing \rightarrow&\ this\ .\ FieldName\ =\ VarName;\\
+        Methods \rightarrow&\ Method\ Methods\ |\ \varepsilon\\
+        Method \rightarrow&\ ClassName\ MethodName\ (\ Parameters\ )\\
+        &\ \{\ return\ Expression;\ \}\\
+        Expression \rightarrow&\ VarName\\
+        &\ |\ Expression\ .\ FieldName\\
+        &\ |\ Expression\ .\ MethodName\ (\ Expressions\ )\\
+        &\ |\ new\ ClassName\ (\ Expressions\ )\\
+        &\ |\ (\ ClassName\ )\ Expression\\
+        Parameters \rightarrow&\ Parameter\ ,\ Parameters\ |\ Parameter\\
+        Parameter \rightarrow&\ ClassName\ VarName\\
+        Expressions \rightarrow&\ Expression\ ,\ Expressions\ |\ Expression\\
+        ClassName \rightarrow&\ id\\
+        FieldName \rightarrow&\ id\\
+        MethdoName \rightarrow&\ id\\
+        VarName \rightarrow&\ id
+    \end{align*}
+    \caption{Контекстно-свободная грамматика языка Featherweight Java}
+    \label{cf-fj}
+\end{figure}
+Для построения дерева разбора использовался генератор разборщиков Happy~\cite{happy}.
+\subsection{Семантический анализатор}
+
+\section{Верификация выделения метода}
