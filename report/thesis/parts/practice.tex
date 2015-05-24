@@ -2,10 +2,32 @@
 \section{Разбор Featherweight Java}
 \subsection{Лексический анализатор}
 Для разбиения исходного кода на токены использовался генератор лексических анализаторов Alex~\cite{alex}.
+Разбиение производится на токены следующих типов:
+\begin{itemize}
+    \item ключевые слова;
+    \item операторы;
+    \item идентификаторы.
+\end{itemize}
+
+К ключевым словам относятся <<$class$>>, <<$return$>>, <<$this$>>, <<$new$>>, <<$extends$>>, <<$super$>>.
+Несмотря на то, что в языке Featherweigth Java $this$ рассматривается как неявная переменная,
+в процессе синтаксического разбора его удобнее считать ключевым словом, для проверки соответствия конструктора синтаксису.
+После синтаксического анализа $this$ считается неявной переменной.
+
+К операторам языка Featherweight Java относятся символы <<$($>>, <<$)$>>, <<$\{$>>, <<$\}$>>, <<$,$>> <<$;$>>, <<$.$>>, <<$=$>>.
+
+К идентификаторам относятся любые последовательности символов, содержащие латинские буквы, цифры, знак подчеркивания, и начинающиеся не с цифры.
+Идентификаторами являются, например, названия классов, полей, методов, имена переменных.
 \subsection{Синтаксический анализатор}
-\begin{figure}[H]
+Перед написанием синтаксического анализатора, необходимо разработать контекстно-свободную грамматику для рассматриваемого языка программирования.
+Контекстно-свободная грамматика языка Featherweight Java представлена на рисунке~\ref{cf-fj}.
+
+Для построения синтаксического анализатора использовался генератор разборщиков Happy~\cite{happy}.
+Для использования данного разборщика, необходимо избавиться от правого ветвления в грамматике.
+Контекстно-свободная грамматика языка Featherweight Java без правого ветвления представлена на рисунке~\ref{cf-fj-happy}.
+\begin{figure}[htb]
     \begin{align*}
-        Classes \rightarrow&\ Class\ Classes\\
+        Classes \rightarrow&\ Class\ Classes\ |\ \varepsilon\\
         Class \rightarrow&\ class\ ClassName\ extends\ ClassName\\
         &\ \{\ Fields\ Constructor\ Methods\ \}\\
         Fields \rightarrow&\ Field\ Fields\ |\ \varepsilon\\
@@ -13,7 +35,7 @@
         Constructor \rightarrow& \ ClassName\ (\ Parameters\ )\\
         &\ \{\ super\ (\ Expressions\ );\ Assigns\ \}\\
         Assigns \rightarrow&\ Assign\ Assigns\ |\ \varepsilon\\
-        Assing \rightarrow&\ this\ .\ FieldName\ =\ VarName;\\
+        Assign \rightarrow&\ this\ .\ FieldName\ =\ VarName;\\
         Methods \rightarrow&\ Method\ Methods\ |\ \varepsilon\\
         Method \rightarrow&\ ClassName\ MethodName\ (\ Parameters\ )\\
         &\ \{\ return\ Expression;\ \}\\
@@ -33,7 +55,42 @@
     \caption{Контекстно-свободная грамматика языка Featherweight Java}
     \label{cf-fj}
 \end{figure}
-Для построения дерева разбора использовался генератор разборщиков Happy~\cite{happy}.
-\subsection{Семантический анализатор}
 
+\begin{figure}[htb]
+    \begin{align*}
+        Classes \rightarrow&\ Class\ Classes\ |\ \varepsilon\\
+        Class \rightarrow&\ class\ ClassName\ extends\ ClassName\\
+        &\ \{\ Members \}\\
+        Members \rightarrow&\ Member\ Members\ |\ \varepsilon\\
+        Member \rightarrow&\ id\ MemberDefinition\\
+        MemberDefinition \rightarrow&\ ConstructorDefinition\\
+        &\ |\ id\ Definition\\
+        ConstructorDefinition \rightarrow&\ (\ Parameters\ )\\
+        &\ \{\ super\ (\ Expressions\ );\ Assigns\ \}\\
+        Assigns \rightarrow&\ Assign\ Assigns\ |\ \varepsilon\\
+        Assign \rightarrow&\ this\ .\ FieldName\ =\ VarName;\\
+        Definition \rightarrow&\ ;\\
+        &\ |\ (\ Parameters\ ) \{\ return\ Expression;\ \}\\
+        Expression \rightarrow&\ VarName\\
+        &\ |\ Expression\ .\ FieldName\\
+        &\ |\ Expression\ .\ MethodName\ (\ Expressions\ )\\
+        &\ |\ new\ ClassName\ (\ Expressions\ )\\
+        &\ |\ (\ ClassName\ )\ Expression\\
+        Parameters \rightarrow&\ Parameter\ ,\ Parameters\ |\ Parameter\\
+        Parameter \rightarrow&\ ClassName\ VarName\\
+        Expressions \rightarrow&\ Expression\ ,\ Expressions\ |\ Expression\\
+        ClassName \rightarrow&\ id\\
+        FieldName \rightarrow&\ id\\
+        MethdoName \rightarrow&\ id\\
+        VarName \rightarrow&\ id
+    \end{align*}
+    \caption{Контекстно-свободная грамматика языка Featherweight Java без правого ветвления}
+    \label{cf-fj-happy}
+\end{figure}
+\subsection{Семантический анализатор}
+В процессе семантического анализа производится вывод типов для выражений, проверяется наличие полей и методов.
+Также, производится проверка соответствия типов параметров при вызове методов.
+В результате семантического анализа дерево разбора преобразуется в абстрактное синтаксическое дерево,
+содержащее информацию о типах выражений.
 \section{Верификация выделения метода}
+Верификация выделения метода проводится согласно алгоритму, описанному во второй главе.
