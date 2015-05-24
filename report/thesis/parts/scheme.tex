@@ -69,3 +69,194 @@
 Значит $e.m_0(\overline{e}) \equiv_r e.m_0'(\overline{e})$.
 \end{proof}
 \section{Замена условного оператора полиморфизмом}
+Согласно определению рассматриваемого метода рефакторинга, происходит преобразование условного оператора, поведение которого зависит от типа объекта (на практике чаще всего используется оператор switch).
+Каждая ветвь условного оператора перемещается в перегруженный метод покласса, а метод базового класса объявляется абстрактным.
+
+\subsection{Ошибки времени выполнения}
+Заметим, что в языке Featherweight Java нет понятия <<абстрактный метод>>. Для обозначения того, что метод является абстрактным, вызов такого метода должен приводить к ошибке выполнения.
+Такого поведения можно добиться, например, используя приведение типов. В листинге~\ref{exception} приведено определение класса, использующегося для вызова ошибок выполнения.
+\begin{lstlisting}[float=htb,label=exception,caption=Определение класса Exception]
+class Exception extends Object {
+    Exception() {
+        super();
+    }
+
+    Exception throw() {
+        return (Exception) new Object();
+    }
+}
+\end{lstlisting}
+
+\subsection{Реализация switch-выражения}
+В языке Featherweight Java нет примитивного логического типа данных, и соответственно нет условных операторов. Однако, их можно реализовать средствами самого языка, как это делается в лямбда-исчислении.
+В листинге~\ref{bool} привден пример реализации логического типа данных. Заметим, что метод $choose$ представляет собой условное выражение, и, по сути, заменяет конструкцию $if-then-else$,
+использующуюся в других языках.
+
+\begin{lstlisting}[float=htb,label=bool,caption=Определение логического типа данных]
+class Bool extends Object {
+    Bool() {
+        super();
+    }
+
+    Object choose(Object trueExpr, Object falseExpr) {
+        return new Exception().throw();
+    }
+
+    Bool and(Bool value) {
+        return (Bool) new Exception().throw();
+    }
+}
+
+class True extends Bool {
+    True() {
+        super();
+    }
+
+    Object choose(Object trueExpr, Object falseExpr) {
+        return trueExpr;
+    }
+}
+
+class False extends Bool {
+    False() {
+        super();
+    }
+
+    Object choose(Object trueExpr, Object falseExpr) {
+        return falseExpr;
+    }
+}
+\end{lstlisting}
+Теперь перейдем к определению switch-выражений. Любое switch-выражение представляет собой список пар, состоящих из логического выражения и выражения, представляющего результат.
+При вычислении по-очереди проверяются все логические выражения. Результатом будет выражение, соответствующего тому условию, которое оказалось верным и находилось в списке раньше остальных.
+Таким образом, для реализации switch-выражений требуется сначала реализовать список пар условие-результат. В листинге~\ref{switch-nodes} приведена реализация элементов такого списка.
+\begin{lstlisting}[float=htb,label=switch-nodes,caption=Реализация элементов списка для switch-выражений]
+class SwitchNode extends Object {
+    SwitchNode() {
+        super();
+    }
+
+    Bool isLeaf() {
+        return (Bool) new Exception().throw();
+    }
+}
+
+class SwitchLeafNode extends SwitchNode {
+    SwitchLeafNode() {
+        super();
+    }
+
+    Bool isLeaf() {
+        return new True();
+    }
+}
+
+class SwitchInnerNode extends SwitchNode {
+    Bool guard;
+    Object value;
+    SwitchNode prev;
+
+    SwitchInnerNode(Bool guard, Object value, SwitchNode prev) {
+        super();
+        this.guard = guard;
+        this.value = value;
+        this.prev = prev;
+    }
+
+    Bool isLeaf() {
+        return new False();
+    }
+}
+\end{lstlisting}
+
+В листинге~\ref{switch} приведена реализация самого списка и реализация switch-выражений. Так как при приведенной реализации связный список представляет собой стек,
+а на практике удобнее использовать очередь, то необходим метод, разворачивающий имеющийся список в обратном порядке.
+Данную реализацию можно было бы обобщить, используя структуры данных $List$ и $Pair$, однако,
+так как в языке Featherweigth Java отсутствует такая конструкция, как generics~\cite{java},
+то это привело бы к большому числу операторов приведения типа.
+\begin{lstlisting}[float=htb,label=switch,caption=Определение switch-выражений.]
+class SwitchList extends Object {
+    SwitchNode top;
+
+    SwitchList(SwitchNode top) {
+        super();
+        this.top = top;
+    }
+
+    SwitchList append(Bool guard, Object value) {
+        return new SwitchList(new SwitchInnerNode(guard, value, this.top));
+    }
+
+    SwitchList appendAllInnerNode(SwitchInnerNode node) {
+        return new SwitchList(new SwitchInnerNode(
+            node.guard, node.value, this.top)).appendAll(node.prev);
+    }
+
+    SwitchList appendAll(SwitchNode node) {
+        return node.isLeaf().choose(
+            this,
+            this.appendAllInnerNode((SwitchInnerNode) node));
+    }
+
+    SwitchList revert() {
+        return new SwitchList(new SwitchLeafNode()).appendAll(this.top);
+    }
+
+    Bool isEmpty() {
+        return this.top.isLeaf();
+    }
+
+    SwitchInnerNode getInnerTop() {
+        return (SwitchInnerNode) this.top;
+    }
+
+    Bool getTopGuard() {
+        return this.getInnerTop().guard;
+    }
+
+    Object getTopValue() {
+        return this.getInnerTop().value;
+    }
+
+    SwitchList remove() {
+        return new SwitchList(this.getInnerTop().prev);
+    }
+}
+class Switch extends Object {
+    Switch() { super(); }
+
+    Object switchList(SwitchList list) {
+        return list.isEmpty().choose(
+            new Exception().throw(),
+            list.getTopGuard().choose(
+                list.getTopValue(),
+                this.switchList(list.remove())));
+    }
+
+    Object switch(SwitchList list) {
+        return this.switchList(list.revert());
+    }
+}
+\end{lstlisting}
+
+\subsection{Алгоритм верификации}
+Перейдем к формализации рассматриваемого метода рефакторинга. Прежде чем применять <<замену условного оператора полиморфизмом>>,
+следует создать необходимую иерархию наследования. Кроме того, если условное выражение является частью более крупного метода,
+то его следует вынести в отдельный метод, используя <<выделение метода>>.
+
+Таким образом, непосредственно перед применением рефакторинга имеется класс $C$, содержащий метод $m$, и классы $D_1, \ldots, D_n$, являющиеся дочерними классами класса $C$.
+Тело метода $m$ представляет собой switch-выражение, результат которого зависит от типа объекта. 
+Должны выполняться два требования:
+\begin{itemize}
+    \item число ветвей в switch-выражении должно совпадать с числом дочерних классов класса $C$;
+    \item все условные выражения в switch-выражении должны приводиться к нормальной форме не более чем за константное число шагов.
+\end{itemize}
+Исходя из этих требований будем считать, что switch-выражение содержит $n$ пар $(guard_1, result_1), \ldots, (guard_n, result_n)$,
+причем для любых $1 \le i, j \le n$ выражение $[new\ D_i(\overline{e})/this]guard_j$ приводится к нормальной форме за константное число шагов.
+
+При проведении верификации прежде всего требуется установить взаимно-однозначное соответствие между ветвями switch-выражения и дочерними классами класса $C$.
+Для этого вычисляются значения выражений $[new\ D_i(\overline{e})/this]guard_j$ для всех дочерних классов и для всех условий switch-выражения.
+Далее классу $D_i$ ставится в соответствие выражение $guard_j$ такое, что $[new\ D_i(\overline{e})/this]guard_j \rightarrow^* True$,
+и для всех $1 \le k < j: [new\ D_i(\overline{e})/this]guard_k \rightarrow^* False$. Если одна и та же ветвь switch-выражения соответствует более чем одному
+дочернему классу, то для такого выражения провести рефакторинг невозможно.
+

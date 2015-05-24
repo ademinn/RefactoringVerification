@@ -66,7 +66,7 @@ $\Sigma^* = \bigcup\limits_{k=0}^\infty$ -- множество всех цепо
 где $\Sigma$ -- алфавит, $N$ - множество нетерминалов, $S$ -- стартовый нетерминал, $P$ -- множество правил вывода.
 \end{definition}
 Типичным примером контекстно-свободной грамматики является грамматика арифметических выражений, представленная на рисунке~\ref{cf-expr}.
-\begin{figure}[H]
+\begin{figure}[htb]
     \begin{align*}
         E &\rightarrow E + E\\
         E &\rightarrow T\\
@@ -79,7 +79,7 @@ $\Sigma^* = \bigcup\limits_{k=0}^\infty$ -- множество всех цепо
     \label{cf-expr}
 \end{figure}
 Для сокращения записи правила с одинаковой головой продукции часто объединяют. На рисунке~\ref{cf-expr-small} представлена сокращенная запись грамматики арифметических выражений.
-\begin{figure}[H]
+\begin{figure}[htb]
     \begin{align*}
         E &\rightarrow E + E\ |\ T\\
         T &\rightarrow T * T\ |\ F\\
@@ -118,7 +118,7 @@ Featherweigth Java -- чистый язык программирования,
 Аналогичным образом расшифровываются $\overline{C}, \overline{x}, \overline{e}$ и~т.\,д.
 Через $\overline{C}\ \overline{f}$ будет обозначаться последовательность $C_1 f_1, \ldots, C_n, f_n$,
 а через $this.\overline{f} = \overline{f}$ будет обозначаться $this.f_1 = f_1, \ldots, this.f_n = f_n$.
-\begin{figure}[H]
+\begin{figure}[htb]
     \begin{align*}
         L &::= class\ C\ extends\ C\ \{\overline{C}\ \overline{f};\ K\ \overline{M}\}\\
         K &::= C(\overline{C}\ \overline{f})\{\ super(\overline{f});\ this.\overline{f} = \overline{f};\ \}\\
@@ -192,7 +192,7 @@ Featherweigth Java -- чистый язык программирования,
     captionpos=b
 }
 %\begin{minipage}{\linewidth}
-\begin{lstlisting}[float,label=em-before,caption=Код до проведения рефакторинга]
+\begin{lstlisting}[float=htb,label=em-before,caption=Код до проведения рефакторинга]
 class A extends Object {
     A() {
         super();
@@ -224,7 +224,7 @@ class PairFactory extends Object {
 }
 \end{lstlisting}
 %\end{minipage}
-\begin{lstlisting}[float,label=em-after,caption=Код после вынесения метода]
+\begin{lstlisting}[float=htb,label=em-after,caption=Код после вынесения метода]
 class A extends Object {
     A() {
         super();
