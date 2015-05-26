@@ -86,33 +86,31 @@
 \section{Описание применяемого подхода}
 
 \subsection{Эквивалентность}
-\begin{frame}{Строгая вычислимость}
-\begin{itemize}
-    \item $\overline{e}$ вычислимо, если $\forall e \in \overline{e}\ e$ вычислимо
-    \item если $e$ вычислимо, то $e.f$ вычислимо;
-    \item если $mbody(m, C) = \overline{x}.e_0$ и вычислимы $e$, $\overline{e}$ и $[\overline{e}/\overline{x}, e/this]e_0$, то $e.m(\overline{e})$ вычислимо;
-    \item если $\overline{e}$ вычислимо, то $new\ C(\overline{e})$ вычислимо;
-    \item если $e$ вычислимо, то $(C) e$ вычислимо.
-\end{itemize}
-\end{frame}
-
 \begin{frame}{Эквивалентность}
-Выражения $\Gamma \vdash e_1$ и $\Gamma \vdash e_2$ назовем эквивалентными, если для любых значений переменных из $\Gamma$ либо оба выражения не являются строго вычислимыми,
-либо оба выражения строго вычислимы и существует выражение $e' : e_1 \rightarrow^* e'$ и $e_2 \rightarrow^* e'$. Эквивалентные выражения будем обозначать $e_1 \equiv e_2$.
+Выражения $\Gamma \vdash e_1$ и $\Gamma \vdash e_2$ назовем эквивалентными по редукции,
+если для любых значений переменных из $\Gamma$ либо существует выражение $e'$ такое, что $e_1 \rightarrow^* e'$ и $e_2 \rightarrow^* e'$,
+либо ни $e_1$ ни $e_2$ не могут быть редуцированы до нормальной формы.
+Эквивалентные по редукции выражения будем обозначать $e_1 \equiv_r e_2$.
 \end{frame}
 
 \subsection{Выделение метода}
 \begin{frame}{Выделение метода}
 Выделение метода -- метод рефакторинга, при котором фрагмент кода, который можно сгруппировать, преобразуется в метод, название которого обозначает его назначение.
+
+Детали:
+\begin{itemize}
+    \item тело выделенного метода не может содержать прямой рекурсии;
+    \item в родительских классах не должен быть определен метод с тем же именем;
+    \item в дочерних классах не должен быть определен метод с тем же именем.
+\end{itemize}
 \end{frame}
 
 \begin{frame}{Редукция по методу}
 \begin{itemize}
     \item Необходимо <<раскрыть>> все вызовы выделенного метода
-    \item Тело метода должно содержать все параметры
     \item Редукция по методу $m$ класса $C$:
     \begin{itemize}
-        \item $\cfrac{\Gamma \vdash e : C \qquad mbody(m, C) = \overline{x}.e_0}{e.m(\overline{d}) \rightarrow_{m,C} [\overline{d}/\overline{x}, e/this]e_0}$
+        \item $\cfrac{\Gamma \vdash this : D \qquad D <: C \qquad \overline{e} \rightarrow_m \overline{e}'}{this.m(\overline{e}) \rightarrow_m [\overline{e}'/\overline{x}]e_m}$
         \item Остальные выражения оставить без изменений
     \end{itemize}
     \item Если $e_1 \rightarrow_{m,C} e_2$, то $e_1 \equiv e_2$
@@ -120,114 +118,50 @@
 \end{frame}
 
 \begin{frame}{Алгоритм верификации}
+\begin{enumerate}
+    \item Проверить, что выделенный метод не содержит прямой рекурсии.
+    \item Проверить, что родительские классы не содержат метод с таким же именем.
+    \item Проверить, что дочерние классы не содержат метод с таким же именем.
+    \item Для всех методов, содержащих вызовы выделенного метода, проверить, что тело метода до и после рефакторинга находятся в отношении редукции по методу.
+\end{enumerate}
+\end{frame}
+
+\subsection{Замена условного оператора полиморфизмом}
+\begin{frame}{Замена условного оператора полиморфизмом}
+До проведения рефакторинга.
 \begin{itemize}
-    \item Проверить, что тело метода $m$ содержит все параметры.
-    \item Найти все методы, содержащие вызов метода $m$.
-    \item Для каждого метода $m_i$ из найденных:
-    \begin{itemize}
-        \item Провести редукцию по методу: $e_i \rightarrow_{m,C} e_i'$.
-        \item Проверить, что тело метода до изменений $e_i^0$ и $e_i'$ структурно эквивалентны.
-    \end{itemize}
+    \item Класс $C$, содержащий метод $m$.
+    \item $D_1, \ldots, D_n$ -- дочерние классы класса $C$.
+    \item Тело метода $m$ -- switch-выражение.
 \end{itemize}
 \end{frame}
 
-\lstset{
-    language=Java,
-    basicstyle=\small\ttfamily,
-    frame=single,
-    captionpos=b
-}
-\section{Пример применения}
-\subsection{Пример применения}
-\begin{frame}[fragile]
-\frametitle{Пример применения}
-\begin{lstlisting}
-class Pair extends Object {
-    Object fst;
-    Object snd;
-    
-    Pair(Object fst, Object snd) {
-        super(); this.fst = fst; this.snd = snd;
-    }
-}
-
-class PairFactory extends Object {
-    PairFactory() { super(); }
-
-    Pair createPair(Object fst, Object snd) {
-        return new Pair(fst, snd);
-    }
-}
-\end{lstlisting}
-\end{frame}
-
-\begin{frame}[fragile]
-\frametitle{Пример применения}
-\begin{lstlisting}
-class Engine extends Object {
-    PairFactory pf;
-
-    Engine(PairFactory pf) {
-        super(); this.pf = pf;
-    }
-    
-    Pair getPair(Object fst) {
-        return this.pf.createPair(fst, new Object());
-    }
-}
-\end{lstlisting}
-\end{frame}
-
-\begin{frame}[fragile]
-\frametitle{Пример применения}
-После выделения метода $createPairFst$
-\begin{lstlisting}
-class PairFactory extends Object {
-    ...
-
-    Pair createPairFst(Object fst) {
-        return this.createPair(fst, new Object()); //OK
-        return this.createPair(new Object(), fst); //FAIL
-    }
-}
-
-class Engine extends Object {
-    ...
-
-    Pair getPair(Object fst) {
-        return this.pf.createPairFst(fst);
-    }
-}
-\end{lstlisting}
-\end{frame}
-
-\begin{frame}{Пример применения}
+\begin{frame}{Замена условного оператора полиморфизмом}
+Нужно установить соответствие между дочерними классами и ветвями switch-выражения.
 \begin{itemize}
-    \item Исходное тело метода:
-    $this.pf.createPair(fst, new\ Object())$
-    \item Корректный рефакторинг:
-    $this.pf.createPairFst(fst) \rightarrow_{createPairFst,PairFactory} 
-    this.pf.createPair(fst, new\ Object())$
-    \item Некорректный рефакторинг:
-    $this.pf.createPairFst(fst) \rightarrow_{createPairFst,PairFactory} 
-    this.pf.createPair(new\ Object(), fst)$
+    \item Вычислить значение всех условий в switch-выражении для всех классов.
+    \item Поставить каждому классу в соответствие первую ветвь, условие которое истинно.
+    \item Требование: условия должны приводиться к нормальной форме за константное число шагов.
 \end{itemize}
 \end{frame}
 
-\begin{frame}[fragile]
-\frametitle{Пример применения}
-Модульный тест
-\begin{lstlisting}
-class TestEngine extends Test {
-    TestResult testGetPair() {
-        return this.assertEqual(
-            new Engine(new PairFactory()).
-                getPair(new Object()),
-            new Pair(new Object(), new Object()));
-    }
-}
-\end{lstlisting}
+\begin{frame}{Алгоритм верификации}
+\begin{enumerate}
+    \item Проверить, что тело преобразуемого метода представляет собой switch-выражение.
+    \item Проверить, что число ветвей в switch-выражении совпадает с числом дочерних классов.
+    \item Для каждого дочернего класса вычислить значения условных выражений всех ветвей switch-выражения.
+    \item Каждому дочернему классу поставить в соответствие первую ветвь switch-выражения, условное выражение которой является истинным.
+    \item Проверить, что каждая ветвь была поставлена в соответствие только одному классу.
+    \item Для каждого дочернего класса проверить, что тело метода после рефакторинга совпадает результатом соответствующей ветви switch-выражения.
+\end{enumerate}
 \end{frame}
+
+% \lstset{
+%     language=Java,
+%     basicstyle=\small\ttfamily,
+%     frame=single,
+%     captionpos=b
+% }
 
 \begin{frame}{Спасибо за внимание! Вопросы?}
 \end{frame}
