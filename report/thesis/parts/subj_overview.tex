@@ -183,81 +183,11 @@ Featherweigth Java -- чистый язык программирования,
     \item улучшение читаемости -- название метода служит цели документирования кода,
     и более длинные методы начинают выглядеть, как ряд комментариев.
 \end{itemize}
-В листингах~\ref{em-before} и~\ref{em-after} представлен пример кода до и после применения метода рефакторинга <<выделение метода>> --
-создание копии объекта класса $Pair$ вынесено в метод $copy$.
 \lstset{
     language=Java,
     basicstyle=\small\ttfamily,
     frame=single,
     captionpos=b
 }
-%\begin{minipage}{\linewidth}
-\begin{lstlisting}[float=htb,label=em-before,caption=Код до проведения рефакторинга]
-class A extends Object {
-    A() {
-        super();
-    }
-}
-
-class Pair extends Object {
-    Object first;
-    Object second;
-
-    Pair(Object first, Object second) {
-        super();
-        this.first = first;
-        this.second = second;
-    }
-}
-
-class PairFactory extends Object {
-    Pair template;
-
-    PairFactory(Pair template) {
-        super();
-        this.template = template;
-    }
-
-    Pair createPair() {
-        return new Pair(this.template.first, this.template.second);
-    }
-}
-\end{lstlisting}
-%\end{minipage}
-\begin{lstlisting}[float=htb,label=em-after,caption=Код после вынесения метода]
-class A extends Object {
-    A() {
-        super();
-    }
-}
-
-class Pair extends Object {
-    Object first;
-    Object second;
-
-    Pair(Object first, Object second) {
-        super();
-        this.first = first;
-        this.second = second;
-    }
-
-    Pair copy() {
-        return new Pair(this.first, this.second);
-    }
-}
-
-class PairFactory extends Object {
-    Pair template;
-
-    PairFactory(Pair template) {
-        super();
-        this.template = template;
-    }
-
-    Pair createPair() {
-        return this.template.copy();
-    }
-}
-\end{lstlisting}
 \section*{Выводы по главе 1}
 \addcontentsline{toc}{section}{Выводы по главе 1}

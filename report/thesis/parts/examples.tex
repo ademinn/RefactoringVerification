@@ -1,0 +1,242 @@
+\chapter{Примеры практического использования}
+
+\section{Выделение метода}
+\begin{lstlisting}[float=ht,label=pf-before,caption=Код до выделения метода]
+class Pair extends Object {
+    Object first;
+    Object second;
+
+    Pair(Object first, Object second) {
+        super();
+        this.first = first;
+        this.second = second;
+    }
+}
+
+class PairFactory extends Object {
+    PairFactory() {
+        super();
+    }
+
+    Pair createPairFst(Object fst) {
+        return new Pair(fst, new Object());
+    }
+
+    Pair createPairSnd(Object snd) {
+        return new Pair(new Object(), snd);
+    }
+}
+\end{lstlisting}
+
+\begin{lstlisting}[float=ht,label=pf-after,caption=Код после выделения метода]
+class PairFactory extends Object {
+    PairFactory() {
+        super();
+    }
+
+    Pair createPair(Object fst, Object snd) {
+    	return new Pair(fst, snd);
+    }
+
+    Pair createPairFst(Object fst) {
+        return this.createPair(fst, new Object());
+    }
+
+    Pair createPairSnd(Object snd) {
+        return this.createPair(new Object(), snd);
+    }
+}
+\end{lstlisting}
+
+
+Процесс верификации.
+\begin{enumerate}
+    \item Метод $createPair$ не содержит прямой рекурсии.
+    \item В классе $Object$ метод $createPair$ отсутствует.
+    \item Дочерние классы отсутствуют.
+    \item Вызов выделенного метода присутствует в методах $createPairFst$ и $createPairSnd$.
+    \begin{itemize}
+        \item Для метода $createPairFst$ выполняется $this.createPair(fst,\ new\ Object()) \rightarrow_m new\ Pair(fst,\ new\ Object())$.
+        В данном случае была произведена подставновка $[fst/fst,\ new\ Object()/snd]new\ Pair(fst,\ snd)$ вместо вызова метода $createPair$.
+        \item Для метода $createPairSnd$ выполняется $this.createPair(new\ Object(),\ snd) \rightarrow_m new\ Pair(new\ Object(),\ snd)$.
+        В данном случае была произведена подставновка $[new\ Object()/fst,\ snd/snd]new\ Pair(fst,\ snd)$ вместо вызова метода $createPair$.
+    \end{itemize}
+\end{enumerate}
+
+\section{Замена условного оператора полиморфизмом}
+Введем натуральные числа по аналогии с лямбда-исчислением.
+\begin{lstlisting}[float=ht,label=nat,caption=Определение натуральных чисел]
+class Nat extends Object {
+    Nat() {
+       super();
+    }
+
+    Bool isZero() {
+        return (Bool) new Exception().throw();
+    }
+
+    Nat add(Nat value)
+
+    Bool equals(Nat value)
+}
+
+class Zero extends Nat {
+    Zero() {
+        super();
+    }
+
+    Bool isZero() {
+        return True;
+    }
+
+    Nat add(Nat value) {
+        return value;
+    }
+
+    Bool equals(Nat value) {
+        return value.isZero();
+    }
+}
+
+class Succ extends Nat {
+    Nat prev;
+    Succ(Nat prev) {
+        super();
+        this.prev = prev;
+    }
+
+    Bool isZero() {
+        return False;
+    }
+
+    Nat add(Nat value) {
+        return prev.add(Succ(value));
+    }
+
+    Bool equals(Nat value) {
+        return value.isZero().choose(
+            new False(),
+            prev.equals(((Succ) value).prev));
+    }
+}
+\end{lstlisting}
+
+Классический пример из Фаулера.
+
+\begin{lstlisting}[float=ht,label=pf-before,caption=Код до рефакторинга]
+class Employee extends Object {
+    ...
+
+    Nat getMonthlySalary() { ... }
+
+    Nat getCommission() { ... }
+
+    Nat getBonus() { ... }
+}
+
+class EmployeeType {
+    ...
+
+    Nat payAmount(Employee emp) {
+        return (Nat) new Switch().switch(new SwitchList(new SwitchLeafNode())
+            .append(
+                this.getTypeCode().equals(0),
+                emp.getMonthlySalary()),
+            .append(
+                this.getTypeCode().equals(1), 
+                emp.getMonthlySalary().add(emp.getCommission())),
+            .append(
+                this.getTypeCode().equals(2),
+                emp.getMonthlySalary().add(emp.getBonus())));
+    }
+
+    Nat getTypeCode() {
+        return (Nat) new Exception().throw();        
+    }
+}
+
+class Engineer extends EmployeeType {
+    ...
+
+    Nat getTypeCode() {
+        return 0;
+    }
+}
+
+class Salesman extends EmployeeType {
+    ...
+
+    Nat getTypeCode() {
+        return 1;
+    }
+}
+
+class Manager extends EmployeeType {
+    ...
+
+    Nat getTypeCode() {
+        return 2;
+    }
+}
+\end{lstlisting}
+
+\begin{lstlisting}[float=ht,label=pf-before,caption=Код после рефакторинга]
+class EmployeeType {
+    ...
+
+    Nat payAmount(Employee emp) {
+        return (Nat) new Exception().throw()
+    }
+}
+
+class Engineer extends EmployeeType {
+    ...
+
+    Nat payAmount(Employee emp) {
+        return emp.getMonthlySalary();
+    }
+}
+
+class Salesman extends EmployeeType {
+    ...
+
+    Nat payAmount(Employee emp) {
+        return emp.getMonthlySalary().add(emp.getCommission());
+    }
+}
+
+class Manager extends EmployeeType {
+    ...
+
+    Nat payAmount(Employee emp) {
+        return emp.getMonthlySalary().add(emp.getBonus());
+    }
+}
+\end{lstlisting}
+Процесс верификации.
+
+\begin{enumerate}
+    \item Тело метода $payAmount$ представляет собой switch-выражение.
+    \item Число ветвей в switch-выражении и число дочерних классов совпадают.
+    \item Значения условных выражений для всех дочерних классов приведены в таблице~\ref{et-c}.
+    \begin{table}[H]
+    \begin{center}
+    \begin{tabular}{|c|c|c|c|}
+    \hline
+    Номер ветви & 1 & 2 & 3\\
+    \hline
+    $Engineer$ & True & False & False\\
+    \hline
+    $Salesman$ & False & True & False\\
+    \hline
+    $Manager$ & False & False & True\\
+    \hline
+    \end{tabular}
+    \end{center}
+    \caption{Значения условных выражений для дочерних классов класса $EmployeeType$}
+    \label{et-c}
+    \end{table}
+    \item Исходя из результатов предыдущего пункта, классу $Engineer$ ставится в соответствие первая ветвь switch-выражения, классу $Salesman$ -- вторая, $Manager$ -- третья.
+    \item Каждая ветвь поставлена в соответствие только одному классу.
+    \item Для всех дочерних классов тело метода после рефакторинга совпадает с результатом соответствующей ветви switch-выражения.
+\end{enumerate}

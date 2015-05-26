@@ -79,7 +79,7 @@
 
 \section{Замена условного оператора полиморфизмом}
 Согласно определению рассматриваемого метода рефакторинга, происходит преобразование условного оператора, поведение которого зависит от типа объекта (на практике чаще всего используется оператор switch).
-Каждая ветвь условного оператора перемещается в перегруженный метод покласса, а метод базового класса объявляется абстрактным.
+Каждая ветвь условного оператора перемещается в перегруженный метод подкласса, а метод базового класса объявляется абстрактным.
 
 \subsection{Ошибки времени выполнения}
 Заметим, что в языке Featherweight Java нет понятия <<абстрактный метод>>. Для обозначения того, что метод является абстрактным, вызов такого метода должен приводить к ошибке выполнения.
@@ -114,6 +114,18 @@ class Bool extends Object {
     Bool and(Bool value) {
         return (Bool) new Exception().throw();
     }
+
+    Bool or(Bool value) {
+        return (Bool) new Exception().throw();
+    }
+
+    Bool not() {
+        return (Bool) new Exception().throw();
+    }
+
+    Bool equals(Bool value) {
+        return this.and(value).or(this.not().and(value.not()));
+    }
 }
 
 class True extends Bool {
@@ -124,6 +136,18 @@ class True extends Bool {
     Object choose(Object trueExpr, Object falseExpr) {
         return trueExpr;
     }
+
+    Bool and(Bool value) {
+        return value;
+    }
+
+    Bool or(Bool value) {
+        return new True();
+    }
+
+    Bool not() {
+        return new False();
+    }
 }
 
 class False extends Bool {
@@ -133,6 +157,18 @@ class False extends Bool {
 
     Object choose(Object trueExpr, Object falseExpr) {
         return falseExpr;
+    }
+
+    Bool and(Bool value) {
+        return new False();
+    }
+
+    Bool or(Bool value) {
+        return value;
+    }
+
+    Bool not() {
+        return new True();
     }
 }
 \end{lstlisting}
