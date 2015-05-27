@@ -103,9 +103,7 @@ class Exception extends Object {
 
 \begin{lstlisting}[float=htb,label=bool,caption=Определение логического типа данных]
 class Bool extends Object {
-    Bool() {
-        super();
-    }
+    Bool() { super(); }
 
     Object choose(Object trueExpr, Object falseExpr) {
         return new Exception().throw();
@@ -129,9 +127,7 @@ class Bool extends Object {
 }
 
 class True extends Bool {
-    True() {
-        super();
-    }
+    True() { super(); }
 
     Object choose(Object trueExpr, Object falseExpr) {
         return trueExpr;
@@ -151,9 +147,7 @@ class True extends Bool {
 }
 
 class False extends Bool {
-    False() {
-        super();
-    }
+    False() { super(); }
 
     Object choose(Object trueExpr, Object falseExpr) {
         return falseExpr;

@@ -1,6 +1,7 @@
 \chapter{Примеры практического использования}
 
 \section{Выделение метода}
+В листингах~\ref{pf-before} и~\ref{pf-after} приведен код до и после выделения метода $createPair$.
 \begin{lstlisting}[float=ht,label=pf-before,caption=Код до выделения метода]
 class Pair extends Object {
     Object first;
@@ -121,9 +122,10 @@ class Succ extends Nat {
 }
 \end{lstlisting}
 
-Классический пример из Фаулера.
+В качестве иллюстрации приведем классический пример из книги Фаулера <<Рефакторинг. Улучшение существующего кода>>.
+В листингах~\ref{et-before} и~\ref{et-after} приведен код до и после замены switch-выражения в методе $payAmount$ полиморфизмом.
 
-\begin{lstlisting}[float=ht,label=pf-before,caption=Код до рефакторинга]
+\begin{lstlisting}[float=ht,label=et-before,caption=Код до рефакторинга]
 class Employee extends Object {
     ...
 
@@ -180,7 +182,7 @@ class Manager extends EmployeeType {
 }
 \end{lstlisting}
 
-\begin{lstlisting}[float=ht,label=pf-before,caption=Код после рефакторинга]
+\begin{lstlisting}[float=ht,label=et-after,caption=Код после рефакторинга]
 class EmployeeType {
     ...
 
