@@ -1,5 +1,11 @@
 \chapter{Практическая реализация}
+Статический анализатор, проводящий верификацию рефакторных преобразований, реализован на языке программирования Haskell~\cite{haskell}.
+В данном языке используются алгебраические типы данных~\cite{Hudak:2007:HHL:1238844.1238856}, удобные для описания деревьев разбора и абстрактных синтаксических деревьев.
+Кроме того, для даннного языка существуют мощные инструменты для генерации лексических и синтаксических анализаторов.
 \section{Разбор Featherweight Java}
+Для проведения синтаксического анализа требуется построить абстрактное синтаксическое дерево исследуемой программы.
+В данном разделе описываются лексический, синтаксический и семантический анализаторы, результатом работы которых
+является абстрактное синтаксическое дерево программы, написанной на языке Featherweight Java.
 \subsection{Лексический анализатор}
 Для разбиения исходного кода на токены использовался генератор лексических анализаторов Alex~\cite{alex}.
 Разбиение производится на токены следующих типов:
@@ -21,36 +27,43 @@
 \subsection{Синтаксический анализатор}
 Перед написанием синтаксического анализатора, необходимо разработать контекстно-свободную грамматику для рассматриваемого языка программирования.
 Контекстно-свободная грамматика языка Featherweight Java представлена на рисунке~\ref{cf-fj}.
+Терминалами являются операторы, такие как <<$.$>> или <<$=$>>, а так же строки, выделенные полужирным шрифтом, такие как $\pmb{class}$ или $\pmb{return}$.
 
 Для построения синтаксического анализатора использовался генератор разборщиков Happy~\cite{happy}.
 Для использования данного разборщика, необходимо избавиться от правого ветвления в грамматике.
 Контекстно-свободная грамматика языка Featherweight Java без правого ветвления представлена на рисунке~\ref{cf-fj-happy}.
+
+В процессе удаления правого ветвления из грамматики потребовалось выделить общий префикс правил,
+соответствующих определениям полей, конструктора и методов.
+Это привело к тому, что полученная грамматика допускает появление нескольких конструкторов в одном классе, либо их отсутствие,
+что противоречит опеределению языка.
+Значит проверка того, что каждый класс содержит ровно один конструктор, должна происходить в процессе семантического анализа.
 \begin{figure}
     \begin{align*}
         Classes \rightarrow&\ Class\ Classes\ |\ \varepsilon\\
-        Class \rightarrow&\ class\ ClassName\ extends\ ClassName\\
+        Class \rightarrow&\ \pmb{class}\ ClassName\ \pmb{extends}\ ClassName\\
         &\ \{\ Fields\ Constructor\ Methods\ \}\\
         Fields \rightarrow&\ Field\ Fields\ |\ \varepsilon\\
         Field \rightarrow&\ ClassName\ FieldName;\\
         Constructor \rightarrow& \ ClassName\ (\ Parameters\ )\\
-        &\ \{\ super\ (\ Expressions\ );\ Assigns\ \}\\
+        &\ \{\ \pmb{super}\ (\ Expressions\ );\ Assigns\ \}\\
         Assigns \rightarrow&\ Assign\ Assigns\ |\ \varepsilon\\
-        Assign \rightarrow&\ this\ .\ FieldName\ =\ VarName;\\
+        Assign \rightarrow&\ \pmb{this}\ .\ FieldName\ =\ VarName;\\
         Methods \rightarrow&\ Method\ Methods\ |\ \varepsilon\\
         Method \rightarrow&\ ClassName\ MethodName\ (\ Parameters\ )\\
-        &\ \{\ return\ Expression;\ \}\\
+        &\ \{\ \pmb{return}\ Expression;\ \}\\
         Expression \rightarrow&\ VarName\\
         &\ |\ Expression\ .\ FieldName\\
         &\ |\ Expression\ .\ MethodName\ (\ Expressions\ )\\
-        &\ |\ new\ ClassName\ (\ Expressions\ )\\
+        &\ |\ \pmb{new}\ ClassName\ (\ Expressions\ )\\
         &\ |\ (\ ClassName\ )\ Expression\\
         Parameters \rightarrow&\ Parameter\ ,\ Parameters\ |\ Parameter\\
         Parameter \rightarrow&\ ClassName\ VarName\\
         Expressions \rightarrow&\ Expression\ ,\ Expressions\ |\ Expression\\
-        ClassName \rightarrow&\ id\\
-        FieldName \rightarrow&\ id\\
-        MethdoName \rightarrow&\ id\\
-        VarName \rightarrow&\ id
+        ClassName \rightarrow&\ \pmb{id}\\
+        FieldName \rightarrow&\ \pmb{id}\\
+        MethdoName \rightarrow&\ \pmb{id}\\
+        VarName \rightarrow&\ \pmb{id}
     \end{align*}
     \caption{Контекстно-свободная грамматика языка Featherweight Java}
     \label{cf-fj}
@@ -59,30 +72,30 @@
 \begin{figure}
     \begin{align*}
         Classes \rightarrow&\ Class\ Classes\ |\ \varepsilon\\
-        Class \rightarrow&\ class\ ClassName\ extends\ ClassName\\
+        Class \rightarrow&\ \pmb{class}\ ClassName\ \pmb{extends}\ ClassName\\
         &\ \{\ Members \}\\
         Members \rightarrow&\ Member\ Members\ |\ \varepsilon\\
-        Member \rightarrow&\ id\ MemberDefinition\\
+        Member \rightarrow&\ \pmb{id}\ MemberDefinition\\
         MemberDefinition \rightarrow&\ ConstructorDefinition\\
-        &\ |\ id\ Definition\\
+        &\ |\ \pmb{id}\ Definition\\
         ConstructorDefinition \rightarrow&\ (\ Parameters\ )\\
-        &\ \{\ super\ (\ Expressions\ );\ Assigns\ \}\\
+        &\ \{\ \pmb{super}\ (\ Expressions\ );\ Assigns\ \}\\
         Assigns \rightarrow&\ Assign\ Assigns\ |\ \varepsilon\\
-        Assign \rightarrow&\ this\ .\ FieldName\ =\ VarName;\\
+        Assign \rightarrow&\ \pmb{this}\ .\ FieldName\ =\ VarName;\\
         Definition \rightarrow&\ ;\\
-        &\ |\ (\ Parameters\ ) \{\ return\ Expression;\ \}\\
+        &\ |\ (\ Parameters\ ) \{\ \pmb{return}\ Expression;\ \}\\
         Expression \rightarrow&\ VarName\\
         &\ |\ Expression\ .\ FieldName\\
         &\ |\ Expression\ .\ MethodName\ (\ Expressions\ )\\
-        &\ |\ new\ ClassName\ (\ Expressions\ )\\
+        &\ |\ \pmb{new}\ ClassName\ (\ Expressions\ )\\
         &\ |\ (\ ClassName\ )\ Expression\\
         Parameters \rightarrow&\ Parameter\ ,\ Parameters\ |\ Parameter\\
         Parameter \rightarrow&\ ClassName\ VarName\\
         Expressions \rightarrow&\ Expression\ ,\ Expressions\ |\ Expression\\
-        ClassName \rightarrow&\ id\\
-        FieldName \rightarrow&\ id\\
-        MethdoName \rightarrow&\ id\\
-        VarName \rightarrow&\ id
+        ClassName \rightarrow&\ \pmb{id}\\
+        FieldName \rightarrow&\ \pmb{id}\\
+        MethdoName \rightarrow&\ \pmb{id}\\
+        VarName \rightarrow&\ \pmb{id}
     \end{align*}
     \caption{Контекстно-свободная грамматика языка Featherweight Java без правого ветвления}
     \label{cf-fj-happy}
@@ -90,7 +103,18 @@
 \subsection{Семантический анализатор}
 В процессе семантического анализа производится вывод типов для выражений, проверяется наличие полей и методов.
 Также, производится проверка соответствия типов параметров при вызове методов.
+Кроме того, так как итоговая контекстно-свободная грамматика, использующаяся в процессе синтаксического разбора,
+допускает появление нескольких конструкторов, либо их отсутствие, то производится проверка,
+что каждый класс содержит ровно один конструктор.
+
 В результате семантического анализа дерево разбора преобразуется в абстрактное синтаксическое дерево,
 содержащее информацию о типах выражений.
-\section{Верификация выделения метода}
-Верификация выделения метода проводится согласно алгоритму, описанному во второй главе.
+\section{Верификация рефакторингов}
+Верификация выделения метода и замены условного оператора полиморфизмом проводится согласно алгоритмам, описанным во второй главе.
+При этом все операции производятся над абстрактным синтаксическим деревом, полученным после семантического анализа.
+\section*{Выводы по главе 2}
+\addcontentsline{toc}{section}{Выводы по главе 2}
+Описано общее устройство статического анализатора, проводящего верификацию рефакторных преобразований.
+Приведено описание лексического анализатора и типы токенов, на которые производится разбиение исходной программы.
+Для синтаксического анализатора приведена грамматика, по которой строится дерево разбора.
+Описаны проверки, которые производятся в процессе семантического анализа.
