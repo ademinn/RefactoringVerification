@@ -25,7 +25,7 @@
 Для построения синтаксического анализатора использовался генератор разборщиков Happy~\cite{happy}.
 Для использования данного разборщика, необходимо избавиться от правого ветвления в грамматике.
 Контекстно-свободная грамматика языка Featherweight Java без правого ветвления представлена на рисунке~\ref{cf-fj-happy}.
-\begin{figure}[htb]
+\begin{figure}
     \begin{align*}
         Classes \rightarrow&\ Class\ Classes\ |\ \varepsilon\\
         Class \rightarrow&\ class\ ClassName\ extends\ ClassName\\
@@ -56,7 +56,7 @@
     \label{cf-fj}
 \end{figure}
 
-\begin{figure}[htb]
+\begin{figure}
     \begin{align*}
         Classes \rightarrow&\ Class\ Classes\ |\ \varepsilon\\
         Class \rightarrow&\ class\ ClassName\ extends\ ClassName\\

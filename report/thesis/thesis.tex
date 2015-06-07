@@ -1,9 +1,18 @@
 \documentclass{itmo-student-thesis}
 \usepackage{placeins}
+\usepackage{tikz}
+\usetikzlibrary{trees}
+\usetikzlibrary{arrows}
 %% Указываем файл с библиографией.
 \addbibresource{thesis.bib}
 
 \begin{document}
+\lstset{
+    % language=Java,
+    % basicstyle=\small\ttfamily,
+    frame=single,
+    % captionpos=b
+}
 
 \studygroup{6538}
 \title{Статическая верификация рефакторных преобразований структуры программ на основе правил редукции в языке программирования Featherweight Java}

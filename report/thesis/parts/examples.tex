@@ -2,7 +2,7 @@
 
 \section{Выделение метода}
 В листингах~\ref{pf-before} и~\ref{pf-after} приведен код до и после выделения метода $createPair$.
-\begin{lstlisting}[float=ht,label=pf-before,caption=Код до выделения метода]
+\begin{lstlisting}[float,label=pf-before,caption=Код до выделения метода]
 class Pair extends Object {
     Object first;
     Object second;
@@ -29,7 +29,7 @@ class PairFactory extends Object {
 }
 \end{lstlisting}
 
-\begin{lstlisting}[float=ht,label=pf-after,caption=Код после выделения метода]
+\begin{lstlisting}[float,label=pf-after,caption=Код после выделения метода]
 class PairFactory extends Object {
     PairFactory() {
         super();
@@ -57,16 +57,22 @@ class PairFactory extends Object {
     \item Дочерние классы отсутствуют.
     \item Вызов выделенного метода присутствует в методах $createPairFst$ и $createPairSnd$.
     \begin{itemize}
-        \item Для метода $createPairFst$ выполняется $this.createPair(fst,\ new\ Object()) \rightarrow_m new\ Pair(fst,\ new\ Object())$.
-        В данном случае была произведена подставновка $[fst/fst,\ new\ Object()/snd]new\ Pair(fst,\ snd)$ вместо вызова метода $createPair$.
-        \item Для метода $createPairSnd$ выполняется $this.createPair(new\ Object(),\ snd) \rightarrow_m new\ Pair(new\ Object(),\ snd)$.
-        В данном случае была произведена подставновка $[new\ Object()/fst,\ snd/snd]new\ Pair(fst,\ snd)$ вместо вызова метода $createPair$.
+        \item Для метода $createPairFst$ выполняется
+        $$this.createPair(fst,\ new\ Object()) \rightarrow_m new\ Pair(fst,\ new\ Object()).$$
+        В данном случае была произведена подставновка
+        $$[fst/fst,\ new\ Object()/snd]new\ Pair(fst,\ snd)$$
+        вместо вызова метода $createPair$.
+        \item Для метода $createPairSnd$ выполняется
+        $$this.createPair(new\ Object(),\ snd) \rightarrow_m new\ Pair(new\ Object(),\ snd).$$
+        В данном случае была произведена подставновка
+        $$[new\ Object()/fst,\ snd/snd]new\ Pair(fst,\ snd)$$
+        вместо вызова метода $createPair$.
     \end{itemize}
 \end{enumerate}
 
 \section{Замена условного оператора полиморфизмом}
 Введем натуральные числа по аналогии с лямбда-исчислением.
-\begin{lstlisting}[float=ht,label=nat,caption=Определение натуральных чисел]
+\begin{lstlisting}[float,label=nat,caption=Определение натуральных чисел]
 class Nat extends Object {
     Nat() {
        super();
@@ -125,7 +131,7 @@ class Succ extends Nat {
 В качестве иллюстрации приведем классический пример из книги Фаулера <<Рефакторинг. Улучшение существующего кода>>.
 В листингах~\ref{et-before} и~\ref{et-after} приведен код до и после замены switch-выражения в методе $payAmount$ полиморфизмом.
 
-\begin{lstlisting}[float=ht,label=et-before,caption=Код до рефакторинга]
+\begin{lstlisting}[float,label=et-before,caption=Код до рефакторинга]
 class Employee extends Object {
     ...
 
@@ -182,7 +188,7 @@ class Manager extends EmployeeType {
 }
 \end{lstlisting}
 
-\begin{lstlisting}[float=ht,label=et-after,caption=Код после рефакторинга]
+\begin{lstlisting}[float,label=et-after,caption=Код после рефакторинга]
 class EmployeeType {
     ...
 
