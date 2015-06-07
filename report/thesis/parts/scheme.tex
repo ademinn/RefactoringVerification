@@ -84,7 +84,7 @@
 \subsection{Ошибки времени выполнения}
 Заметим, что в языке Featherweight Java нет понятия <<абстрактный метод>>. Для обозначения того, что метод является абстрактным, вызов такого метода должен приводить к ошибке выполнения.
 Такого поведения можно добиться, например, используя приведение типов. В листинге~\ref{exception} приведено определение класса, использующегося для вызова ошибок выполнения.
-\begin{lstlisting}[float=htb,label=exception,caption=Определение класса Exception]
+\begin{lstlisting}[float=htb,label=exception,caption=Определение класса Exception.]
 class Exception extends Object {
     Exception() {
         super();
@@ -98,10 +98,10 @@ class Exception extends Object {
 
 \subsection{Реализация switch-выражения}
 В языке Featherweight Java нет примитивного логического типа данных, и соответственно нет условных операторов. Однако, их можно реализовать средствами самого языка, как это делается в лямбда-исчислении.
-В листинге~\ref{bool} привден пример реализации логического типа данных. Заметим, что метод $choose$ представляет собой условное выражение, и, по сути, заменяет конструкцию $if-then-else$,
+В листингах~\ref{bool-base},~\ref{bool-true} и~\ref{bool-false} привден пример реализации логического типа данных. Заметим, что метод $choose$ представляет собой условное выражение, и, по сути, заменяет конструкцию $if-then-else$,
 использующуюся в других языках.
 
-\begin{lstlisting}[float=htb,label=bool,caption=Определение логического типа данных]
+\begin{lstlisting}[float,label=bool-base,caption=Определение базового класса логического типа данных.]
 class Bool extends Object {
     Bool() { super(); }
 
@@ -125,7 +125,8 @@ class Bool extends Object {
         return this.and(value).or(this.not().and(value.not()));
     }
 }
-
+\end{lstlisting}
+\begin{lstlisting}[float,label=bool-true,caption=Определение класса True.]
 class True extends Bool {
     True() { super(); }
 
@@ -145,7 +146,8 @@ class True extends Bool {
         return new False();
     }
 }
-
+\end{lstlisting}
+\begin{lstlisting}[float,label=bool-false,caption=Определение класса False.]
 class False extends Bool {
     False() { super(); }
 
@@ -169,7 +171,7 @@ class False extends Bool {
 Теперь перейдем к определению switch-выражений. Любое switch-выражение представляет собой список пар, состоящих из логического выражения и выражения, представляющего результат.
 При вычислении по-очереди проверяются все логические выражения. Результатом будет выражение, соответствующего тому условию, которое оказалось верным и находилось в списке раньше остальных.
 Таким образом, для реализации switch-выражений требуется сначала реализовать список пар условие-результат. В листинге~\ref{switch-nodes} приведена реализация элементов такого списка.
-\begin{lstlisting}[float=htb,label=switch-nodes,caption=Реализация элементов списка для switch-выражений]
+\begin{lstlisting}[float,label=switch-nodes,caption=Реализация элементов списка для switch-выражений]
 class SwitchNode extends Object {
     SwitchNode() {
         super();
@@ -208,12 +210,12 @@ class SwitchInnerNode extends SwitchNode {
 }
 \end{lstlisting}
 
-В листинге~\ref{switch} приведена реализация самого списка и реализация switch-выражений. Так как при приведенной реализации связный список представляет собой стек,
+В листинге~\ref{switch-list} приведена реализация самого списка, а в листинге~\ref{switch} -- реализация switch-выражений. Так как при приведенной реализации связный список представляет собой стек,
 а на практике удобнее использовать очередь, то необходим метод, разворачивающий имеющийся список в обратном порядке.
 Данную реализацию можно было бы обобщить, используя структуры данных $List$ и $Pair$, однако,
 так как в языке Featherweigth Java отсутствует такая конструкция, как generics~\cite{java},
 то это привело бы к большому числу операторов приведения типа.
-\begin{lstlisting}[float=htb,label=switch,caption=Определение switch-выражений.]
+\begin{lstlisting}[float,label=switch-list,caption=Определение списка пар условие-результат для switch-выражений.]
 class SwitchList extends Object {
     SwitchNode top;
     SwitchList(SwitchNode top) {
@@ -260,6 +262,8 @@ class SwitchList extends Object {
         return new SwitchList(this.getInnerTop().prev);
     }
 }
+\end{lstlisting}
+\begin{lstlisting}[float,label=switch,caption=Определение switch-выражений.]
 class Switch extends Object {
     Switch() { super(); }
 
