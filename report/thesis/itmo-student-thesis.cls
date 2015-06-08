@@ -1,5 +1,5 @@
 \NeedsTeXFormat{LaTeX2e}
-\ProvidesClass{itmo-student-thesis}[2015/06/08 v1.0.1]
+\ProvidesClass{itmo-student-thesis}[2015/06/08 v1.0.2]
 
 \LoadClass[14pt,a4paper]{extreport}
 
@@ -165,6 +165,9 @@
   \let\c@lstlisting\c@algorithm
   \let\thelstlisting\thealgorithm
   \let\ftype@lstlisting\ftype@algorithm % give the floats the same precedence
+  \counterwithout{lstlisting}{chapter}
+  \counterwithout{lstlisting}{section}
+  \counterwithout{lstlisting}{subsection}
 }
      
 

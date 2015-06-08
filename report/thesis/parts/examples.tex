@@ -1,8 +1,9 @@
 \chapter{Примеры практического использования}
-
 \section{Выделение метода}
-В листингах~\ref{pf-before} и~\ref{pf-after} приведен код до и после выделения метода $createPair$.
-\begin{lstlisting}[float,label=pf-before,caption=Код до выделения метода]
+\subsection{Корректно проведенный рефакторинг}
+В листингах~\ref{pf-before} и~\ref{pf-after} приведен код до и после выделения метода $createPair$
+в методах $createPairFst$ и $createPairSnd$.
+\begin{lstlisting}[float,label=pf-before,caption=Код до выделения метода.]
 class Pair extends Object {
     Object first;
     Object second;
@@ -28,8 +29,7 @@ class PairFactory extends Object {
     }
 }
 \end{lstlisting}
-
-\begin{lstlisting}[float,label=pf-after,caption=Код после выделения метода]
+\begin{lstlisting}[float,label=pf-after,caption=Код после выделения метода.]
 class PairFactory extends Object {
     PairFactory() {
         super();
@@ -48,7 +48,6 @@ class PairFactory extends Object {
     }
 }
 \end{lstlisting}
-
 
 Процесс верификации.
 \begin{enumerate}
@@ -69,10 +68,38 @@ class PairFactory extends Object {
         вместо вызова метода $createPair$.
     \end{itemize}
 \end{enumerate}
+\subsection{Некорректно проведенный рефакторинг}
+Предположим, что в предыдущем примере при вынесении метода произошла ошибка, и при создании объекта $Pair$ параметры поменялись местами.
+Код неправильно проведенного рефакторинга приведен в листинге~\ref{pf-fail}.
+
+В таком случае, при проведении редукции по методу мы получим
+$$this.createPair(fst,\ new\ Object()) \rightarrow_m new\ Pair(new\ Object(),\ fst),$$
+$$this.createPair(new\ Object(),\ snd) \rightarrow_m new\ Pair(snd,\ new\ Object()),$$
+что не соответствует исходному телу методов $createPairFst$ и $createPairSnd$,
+а значит процесс верификации закончится с ошибкой на четвертом шаге.
+\begin{lstlisting}[float,label=pf-fail,caption=Код после ошибочного выделения метода.]
+class PairFactory extends Object {
+    ...
+
+    Pair createPair(Object fst, Object snd) {
+        return new Pair(snd, fst);
+    }
+
+    ...
+}
+\end{lstlisting}
 
 \section{Замена условного оператора полиморфизмом}
-Введем натуральные числа по аналогии с лямбда-исчислением.
-\begin{lstlisting}[float,label=nat,caption=Определение натуральных чисел]
+\subsection{Реализация натуральных чисел}
+Согласно определению замены условного оператора полиморфизмом поведение условного оператора должно зависеть от типа объекта.
+На практике, как правило, для указания типа объекта используются численные либо строковые константы,
+однако в языке Featherweigth Java нет примитивных типов, представляющих числа или печатные символы.
+
+Натуральные числа могут быть введены по аналогии с лямбда-исчислением.
+Пример их реализации приведен в листингах~\ref{nat-base},~\ref{nat-zero} и~\ref{nat-succ}.
+В таком виде число <<ноль>> будет представлено как $new\ Zero()$, <<один>> как $new\ Succ(new\ Zero())$, <<два>> -- $new\ Succ(new\ Succ(new\ Zero()))$ и~т.~д.
+Далее, для простоты, будем использовать стандартные обозначения для числовых констант.
+\begin{lstlisting}[float,label=nat-base,caption=Определение базового класса натуральных чисел.]
 class Nat extends Object {
     Nat() {
        super();
@@ -82,11 +109,16 @@ class Nat extends Object {
         return (Bool) new Exception().throw();
     }
 
-    Nat add(Nat value)
+    Nat add(Nat value) {
+        return (Nat) new Exception().throw();
+    }
 
-    Bool equals(Nat value)
+    Bool equals(Nat value) {
+        return (Bool) new Exception().throw();
+    }
 }
-
+\end{lstlisting}
+\begin{lstlisting}[float,label=nat-zero,caption=Определение класса{,} представляющего число ноль.]
 class Zero extends Nat {
     Zero() {
         super();
@@ -104,7 +136,8 @@ class Zero extends Nat {
         return value.isZero();
     }
 }
-
+\end{lstlisting}
+\begin{lstlisting}[float,label=nat-succ,caption=Определение класса{,} представляющего натуральное число{,} следующее за указанным.]
 class Succ extends Nat {
     Nat prev;
     Succ(Nat prev) {
@@ -127,11 +160,11 @@ class Succ extends Nat {
     }
 }
 \end{lstlisting}
-
+\subsection{Корректно проведенный рефакторинг}
 В качестве иллюстрации приведем классический пример из книги Фаулера <<Рефакторинг. Улучшение существующего кода>>.
-В листингах~\ref{et-before} и~\ref{et-after} приведен код до и после замены switch-выражения в методе $payAmount$ полиморфизмом.
+В листингах~\ref{et-before-e-et} и~\ref{et-before-esm} приведен код до, а в листинге~\ref{et-after} после замены switch-выражения в методе $payAmount$ полиморфизмом.
 
-\begin{lstlisting}[float,label=et-before,caption=Код до рефакторинга]
+\begin{lstlisting}[float,label=et-before-e-et,caption=Код до рефакторинга. Определение классов $Employee$ и $EmployeeType$.]
 class Employee extends Object {
     ...
 
@@ -162,7 +195,8 @@ class EmployeeType {
         return (Nat) new Exception().throw();        
     }
 }
-
+\end{lstlisting}
+\begin{lstlisting}[float,label=et-before-esm,caption=Код до рефакторинга. Определение наследников класса $EmployeeType$.]
 class Engineer extends EmployeeType {
     ...
 
@@ -188,7 +222,7 @@ class Manager extends EmployeeType {
 }
 \end{lstlisting}
 
-\begin{lstlisting}[float,label=et-after,caption=Код после рефакторинга]
+\begin{lstlisting}[float,label=et-after,caption=Код после рефакторинга.]
 class EmployeeType {
     ...
 
@@ -241,10 +275,30 @@ class Manager extends EmployeeType {
     \hline
     \end{tabular}
     \end{center}
-    \caption{Значения условных выражений для дочерних классов класса $EmployeeType$}
+    \caption{Значения условных выражений для дочерних классов класса $EmployeeType$.}
     \label{et-c}
     \end{table}
     \item Исходя из результатов предыдущего пункта, классу $Engineer$ ставится в соответствие первая ветвь switch-выражения, классу $Salesman$ -- вторая, $Manager$ -- третья.
     \item Каждая ветвь поставлена в соответствие только одному классу.
     \item Для всех дочерних классов тело метода после рефакторинга совпадает с результатом соответствующей ветви switch-выражения.
 \end{enumerate}
+\subsection{Некорректно проведенный рефакторинг}
+Предположим, что в предыдущем примере, при перемещении результата ветви switch-выражения, соответствующей классу $Manager$, произошла ошибка,
+и метод $payAmount$ для класса $Manager$ стал возврашать то же, что и для класса $Salesman$.
+Код неправильно проведенного рефакторинга приведен в листинге~\ref{et-fail}.
+Тогда процесс верификации завершится с ошибкой на шестом шаге при сравнении тела метода $payAmount$ класса $Manager$ с
+результатом соответствующей ему ветви switch-выражения.
+\begin{lstlisting}[float,label=et-fail,caption=Код после некорректно проведенного рефакторинга.]
+class Manager extends EmployeeType {
+    ...
+
+    Nat payAmount(Employee emp) {
+        return emp.getMonthlySalary().add(emp.getCommission());
+    }
+}
+\end{lstlisting}
+\section*{Выводы по главе 4}
+\addcontentsline{toc}{section}{Выводы по главе 4}
+Рассмотрены примеры корректно и некорректно проведенных рефакторингов -- выделения метода и замены условного оператора полиморфизмом.
+Показано, что разработанные алгоритмы верификации подтверждают корректность правильно проведенных рефакторингов и заканчиваются с ошибкой
+при неправильно проведенных рефакторингах.
